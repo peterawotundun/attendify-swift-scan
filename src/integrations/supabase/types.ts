@@ -14,7 +14,152 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attendance_records: {
+        Row: {
+          check_in_time: string
+          id: string
+          rfid_scan: boolean | null
+          session_id: string
+          student_id: string
+        }
+        Insert: {
+          check_in_time?: string
+          id?: string
+          rfid_scan?: boolean | null
+          session_id: string
+          student_id: string
+        }
+        Update: {
+          check_in_time?: string
+          id?: string
+          rfid_scan?: boolean | null
+          session_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_sessions: {
+        Row: {
+          class_id: string
+          created_at: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          session_code: string
+          start_time: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          session_code: string
+          start_time?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          session_code?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_sessions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          lecturer_id: string | null
+          name: string
+          room: string
+          time: string
+          total_students: number | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          lecturer_id?: string | null
+          name: string
+          room: string
+          time: string
+          total_students?: number | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          lecturer_id?: string | null
+          name?: string
+          room?: string
+          time?: string
+          total_students?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string | null
+          id: string
+          matric_number: string
+          name: string
+          rfid_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          id?: string
+          matric_number: string
+          name: string
+          rfid_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          id?: string
+          matric_number?: string
+          name?: string
+          rfid_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

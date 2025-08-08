@@ -6,50 +6,202 @@ import { StatusIndicator } from "@/components/StatusIndicator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Users, Clock, Download } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+interface Student {
+  id: string;
+  name: string;
+  matric_number: string;
+  rfid_code: string;
+  department: string;
+}
+
+interface AttendanceRecord {
+  student: Student;
+  check_in_time: string;
+  rfid_code: string;
+}
 
 const AttendanceSession = () => {
   const { id } = useParams();
-  const [sessionCode] = useState("ATD-2024-001");
+  const { toast } = useToast();
+  const [sessionData, setSessionData] = useState<any>(null);
+  const [classData, setClassData] = useState<any>(null);
   const [presentCount, setPresentCount] = useState(0);
-  const [recentScans, setRecentScans] = useState<any[]>([]);
+  const [recentScans, setRecentScans] = useState<AttendanceRecord[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock class data
-  const classInfo = {
-    name: "Data Structures",
-    code: "CS201",
-    time: "10:00 AM - 11:30 AM",
-    room: "A101",
-    totalStudents: 45
+  // Fetch session and class data
+  useEffect(() => {
+    fetchSessionData();
+    fetchStudents();
+  }, [id]);
+
+  const fetchSessionData = async () => {
+    try {
+      const { data: session, error: sessionError } = await supabase
+        .from('attendance_sessions')
+        .select(`
+          *,
+          classes (*)
+        `)
+        .eq('session_code', 'ATD-2024-001')
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      setSessionData(session);
+      setClassData(session.classes);
+      
+      // Fetch existing attendance records for this session
+      const { data: records, error: recordsError } = await supabase
+        .from('attendance_records')
+        .select(`
+          *,
+          students (*)
+        `)
+        .eq('session_id', session.id)
+        .order('check_in_time', { ascending: false });
+
+      if (recordsError) throw recordsError;
+
+      const formattedRecords = records.map((record: any) => ({
+        student: record.students,
+        check_in_time: new Date(record.check_in_time).toLocaleTimeString(),
+        rfid_code: record.students.rfid_code
+      }));
+
+      setRecentScans(formattedRecords);
+      setPresentCount(records.length);
+    } catch (error) {
+      console.error('Error fetching session data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load session data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Simulate real-time RFID scans
-  useEffect(() => {
-    const mockStudents = [
-      { id: "STU001", name: "Alice Johnson", avatar: "" },
-      { id: "STU002", name: "Bob Smith", avatar: "" },
-      { id: "STU003", name: "Carol Davis", avatar: "" },
-      { id: "STU004", name: "David Wilson", avatar: "" },
-      { id: "STU005", name: "Emily Brown", avatar: "" }
-    ];
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('name');
 
-    let scanIndex = 0;
-    const interval = setInterval(() => {
-      if (scanIndex < mockStudents.length) {
-        const student = mockStudents[scanIndex];
-        const newScan = {
-          ...student,
-          time: new Date().toLocaleTimeString(),
-          timestamp: Date.now()
-        };
-        
-        setRecentScans(prev => [newScan, ...prev]);
-        setPresentCount(prev => prev + 1);
-        scanIndex++;
-      }
-    }, 3000);
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
+
+  // Simulate RFID card scans (automatic demo)
+  useEffect(() => {
+    if (!students.length || !sessionData) return;
+
+    const availableStudents = students.filter(student => 
+      !recentScans.some(scan => scan.student.id === student.id)
+    );
+
+    if (availableStudents.length === 0) return;
+
+    const interval = setInterval(async () => {
+      const randomStudent = availableStudents[Math.floor(Math.random() * availableStudents.length)];
+      await handleRFIDScan(randomStudent.rfid_code);
+    }, 4000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [students, sessionData, recentScans]);
+
+  const handleRFIDScan = async (rfidCode: string) => {
+    try {
+      // Find student by RFID code
+      const student = students.find(s => s.rfid_code === rfidCode);
+      if (!student) {
+        toast({
+          title: "Unknown RFID Card",
+          description: `RFID code ${rfidCode} not found in student database`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if student already checked in
+      const existingRecord = recentScans.find(scan => scan.student.id === student.id);
+      if (existingRecord) {
+        toast({
+          title: "Already Checked In",
+          description: `${student.name} has already checked in`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Record attendance
+      const { error } = await supabase
+        .from('attendance_records')
+        .insert({
+          session_id: sessionData.id,
+          student_id: student.id,
+          rfid_scan: true
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      const newRecord: AttendanceRecord = {
+        student,
+        check_in_time: new Date().toLocaleTimeString(),
+        rfid_code: rfidCode
+      };
+
+      setRecentScans(prev => [newRecord, ...prev]);
+      setPresentCount(prev => prev + 1);
+
+      toast({
+        title: "Check-in Successful",
+        description: `${student.name} (${student.matric_number}) checked in`,
+      });
+    } catch (error) {
+      console.error('Error recording attendance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to record attendance",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-muted/30 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading session data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionData || !classData) {
+    return (
+      <div className="min-h-screen bg-muted/30 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Session Not Found</h2>
+          <p className="text-muted-foreground mb-4">The attendance session could not be loaded.</p>
+          <Button asChild>
+            <Link to="/lecturer">Back to Dashboard</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30 p-6">
@@ -79,21 +231,21 @@ const AttendanceSession = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-lg">{classInfo.name}</h3>
-                  <p className="text-muted-foreground">{classInfo.code}</p>
+                  <h3 className="font-semibold text-lg">{classData.name}</h3>
+                  <p className="text-muted-foreground">{classData.code}</p>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Time:</span>
-                    <span className="font-medium">{classInfo.time}</span>
+                    <span className="font-medium">{classData.time}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Room:</span>
-                    <span className="font-medium">{classInfo.room}</span>
+                    <span className="font-medium">{classData.room}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Total Students:</span>
-                    <span className="font-medium">{classInfo.totalStudents}</span>
+                    <span className="font-medium">{classData.total_students}</span>
                   </div>
                 </div>
               </CardContent>
@@ -106,7 +258,7 @@ const AttendanceSession = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-primary mb-2">{sessionCode}</div>
+                  <div className="text-3xl font-bold text-primary mb-2">{sessionData.session_code}</div>
                   <p className="text-xs text-muted-foreground">
                     Students can use this code for manual check-in
                   </p>
@@ -125,16 +277,16 @@ const AttendanceSession = () => {
                 <div className="text-center space-y-2">
                   <div className="text-4xl font-bold text-success">{presentCount}</div>
                   <p className="text-muted-foreground">
-                    of {classInfo.totalStudents} students present
+                    of {classData.total_students} students present
                   </p>
                   <div className="w-full bg-muted rounded-full h-3">
                     <div 
                       className="bg-success h-3 rounded-full transition-all duration-300" 
-                      style={{ width: `${(presentCount / classInfo.totalStudents) * 100}%` }}
+                      style={{ width: `${(presentCount / classData.total_students) * 100}%` }}
                     />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {Math.round((presentCount / classInfo.totalStudents) * 100)}% attendance rate
+                    {Math.round((presentCount / classData.total_students) * 100)}% attendance rate
                   </p>
                 </div>
               </CardContent>
@@ -170,25 +322,25 @@ const AttendanceSession = () => {
                   ) : (
                     recentScans.map((scan, index) => (
                       <div 
-                        key={scan.timestamp} 
+                        key={`${scan.student.id}-${scan.check_in_time}`} 
                         className={`flex items-center space-x-4 p-4 rounded-lg border transition-all duration-300 ${
                           index === 0 ? 'bg-success/10 border-success/20' : 'bg-card'
                         }`}
                       >
                         <Avatar>
-                          <AvatarImage src={scan.avatar} />
                           <AvatarFallback>
-                            {scan.name.split(' ').map((n: string) => n[0]).join('')}
+                            {scan.student.name.split(' ').map((n: string) => n[0]).join('')}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <h4 className="font-medium">{scan.name}</h4>
-                          <p className="text-sm text-muted-foreground">ID: {scan.id}</p>
+                          <h4 className="font-medium">{scan.student.name}</h4>
+                          <p className="text-sm text-muted-foreground">ID: {scan.student.matric_number}</p>
+                          <p className="text-xs text-muted-foreground">RFID: {scan.rfid_code}</p>
                         </div>
                         <div className="text-right">
                           <div className="flex items-center space-x-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{scan.time}</span>
+                            <span className="text-sm font-medium">{scan.check_in_time}</span>
                           </div>
                           {index === 0 && (
                             <Badge className="mt-1 bg-success text-success-foreground">
