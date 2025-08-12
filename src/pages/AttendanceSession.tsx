@@ -47,7 +47,7 @@ const AttendanceSession = () => {
           *,
           classes (*)
         `)
-        .eq('session_code', 'ATD-2024-001')
+        .eq('id', id)
         .single();
 
       if (sessionError) throw sessionError;
@@ -101,82 +101,54 @@ const AttendanceSession = () => {
     }
   };
 
-  // Simulate RFID card scans (automatic demo)
+  // Real-time listener for new attendance records
   useEffect(() => {
-    if (!students.length || !sessionData) return;
+    if (!sessionData) return;
 
-    const availableStudents = students.filter(student => 
-      !recentScans.some(scan => scan.student.id === student.id)
-    );
+    const channel = supabase
+      .channel('attendance-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'attendance_records',
+          filter: `session_id=eq.${sessionData.id}`
+        },
+        async (payload) => {
+          // Fetch the student data for the new record
+          const { data: studentData, error } = await supabase
+            .from('students')
+            .select('*')
+            .eq('id', payload.new.student_id)
+            .single();
 
-    if (availableStudents.length === 0) return;
+          if (!error && studentData) {
+            const newRecord: AttendanceRecord = {
+              student: studentData,
+              check_in_time: new Date(payload.new.check_in_time).toLocaleTimeString(),
+              rfid_code: studentData.rfid_code
+            };
 
-    const interval = setInterval(async () => {
-      const randomStudent = availableStudents[Math.floor(Math.random() * availableStudents.length)];
-      await handleRFIDScan(randomStudent.rfid_code);
-    }, 4000);
+            setRecentScans(prev => [newRecord, ...prev]);
+            setPresentCount(prev => prev + 1);
 
-    return () => clearInterval(interval);
-  }, [students, sessionData, recentScans]);
+            toast({
+              title: "Check-in Successful",
+              description: `${studentData.name} (${studentData.matric_number}) checked in`,
+            });
+          }
+        }
+      )
+      .subscribe();
 
-  const handleRFIDScan = async (rfidCode: string) => {
-    try {
-      // Find student by RFID code
-      const student = students.find(s => s.rfid_code === rfidCode);
-      if (!student) {
-        toast({
-          title: "Unknown RFID Card",
-          description: `RFID code ${rfidCode} not found in student database`,
-          variant: "destructive",
-        });
-        return;
-      }
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionData, toast]);
 
-      // Check if student already checked in
-      const existingRecord = recentScans.find(scan => scan.student.id === student.id);
-      if (existingRecord) {
-        toast({
-          title: "Already Checked In",
-          description: `${student.name} has already checked in`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Record attendance
-      const { error } = await supabase
-        .from('attendance_records')
-        .insert({
-          session_id: sessionData.id,
-          student_id: student.id,
-          rfid_scan: true
-        });
-
-      if (error) throw error;
-
-      // Update local state
-      const newRecord: AttendanceRecord = {
-        student,
-        check_in_time: new Date().toLocaleTimeString(),
-        rfid_code: rfidCode
-      };
-
-      setRecentScans(prev => [newRecord, ...prev]);
-      setPresentCount(prev => prev + 1);
-
-      toast({
-        title: "Check-in Successful",
-        description: `${student.name} (${student.matric_number}) checked in`,
-      });
-    } catch (error) {
-      console.error('Error recording attendance:', error);
-      toast({
-        title: "Error",
-        description: "Failed to record attendance",
-        variant: "destructive",
-      });
-    }
-  };
+  // This function is called by the RFID hardware via the edge function
+  // The edge function handles all the logic and database updates
 
   if (loading) {
     return (
@@ -314,11 +286,15 @@ const AttendanceSession = () => {
               <CardContent>
                 <div className="space-y-3">
                   {recentScans.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Waiting for student check-ins...</p>
-                      <p className="text-sm">Students can tap their ID cards on the RFID reader</p>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Waiting for RFID card scans...</p>
+                    <p className="text-sm">Students should tap their ID cards on the RFID reader</p>
+                    <div className="mt-4 p-4 bg-muted rounded-lg">
+                      <p className="text-sm font-medium">Session Code: {sessionData?.session_code}</p>
+                      <p className="text-xs text-muted-foreground">Use this code for manual check-in if RFID fails</p>
                     </div>
+                  </div>
                   ) : (
                     recentScans.map((scan, index) => (
                       <div 
