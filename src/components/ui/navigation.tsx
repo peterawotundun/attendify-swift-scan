@@ -1,62 +1,83 @@
-import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { LogOut, User } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-interface NavigationProps {
-  className?: string;
-}
-
-export function Navigation({ className }: NavigationProps) {
-  const location = useLocation();
-  
-  const isActive = (path: string) => location.pathname === path;
-
+export const Navigation = () => {
   return (
-    <nav className={cn("flex items-center space-x-8", className)}>
-      <Link
-        to="/"
-        className={cn(
-          "text-sm font-medium transition-colors hover:text-primary",
-          isActive("/") ? "text-primary" : "text-muted-foreground"
-        )}
-      >
-        Home
+    <nav className="flex items-center space-x-6">
+      <Link to="#features" className="text-sm font-medium hover:text-primary">
+        Features
       </Link>
-      <Link
-        to="/about"
-        className={cn(
-          "text-sm font-medium transition-colors hover:text-primary",
-          isActive("/about") ? "text-primary" : "text-muted-foreground"
-        )}
-      >
+      <Link to="#about" className="text-sm font-medium hover:text-primary">
         About
       </Link>
-      <Link
-        to="/contact"
-        className={cn(
-          "text-sm font-medium transition-colors hover:text-primary",
-          isActive("/contact") ? "text-primary" : "text-muted-foreground"
-        )}
-      >
+      <Link to="#contact" className="text-sm font-medium hover:text-primary">
         Contact
       </Link>
     </nav>
   );
-}
+};
 
-interface AuthButtonsProps {
-  className?: string;
-}
+export const AuthButtons = () => {
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
 
-export function AuthButtons({ className }: AuthButtonsProps) {
+  if (loading) {
+    return (
+      <div className="flex space-x-2">
+        <div className="w-16 h-9 bg-muted animate-pulse rounded"></div>
+        <div className="w-16 h-9 bg-muted animate-pulse rounded"></div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return (
+      <div className="flex items-center space-x-4">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="flex items-center space-x-2">
+              <User className="h-4 w-4" />
+              <span>{user.email}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate("/lecturer")}>
+              Lecturer Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/student")}>
+              Student Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/admin")}>
+              Admin Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={signOut} className="text-destructive">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn("flex items-center space-x-4", className)}>
-      <Button variant="outline" asChild className="btn-secondary">
-        <Link to="/register">Register</Link>
+    <div className="flex space-x-2">
+      <Button variant="ghost" asChild>
+        <Link to="/auth">Sign In</Link>
       </Button>
-      <Button asChild className="btn-primary">
-        <Link to="/lecturer">Login</Link>
+      <Button asChild>
+        <Link to="/auth">Get Started</Link>
       </Button>
     </div>
   );
-}
+};
