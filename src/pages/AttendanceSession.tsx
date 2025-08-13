@@ -41,14 +41,35 @@ const AttendanceSession = () => {
 
   const fetchSessionData = async () => {
     try {
-      const { data: session, error: sessionError } = await supabase
-        .from('attendance_sessions')
-        .select(`
-          *,
-          classes (*)
-        `)
-        .eq('id', id)
-        .single();
+      // Validate if id is a proper UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
+      let sessionQuery;
+      
+      if (uuidRegex.test(id || '')) {
+        // If it's a UUID, query by ID
+        sessionQuery = supabase
+          .from('attendance_sessions')
+          .select(`
+            *,
+            classes (*)
+          `)
+          .eq('id', id)
+          .single();
+      } else {
+        // If it's not a UUID, try to find by session_code or get the first active session
+        sessionQuery = supabase
+          .from('attendance_sessions')
+          .select(`
+            *,
+            classes (*)
+          `)
+          .eq('session_code', `ATD-2024-00${id}`)
+          .eq('is_active', true)
+          .single();
+      }
+
+      const { data: session, error: sessionError } = await sessionQuery;
 
       if (sessionError) throw sessionError;
 
