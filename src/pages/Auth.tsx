@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
@@ -19,8 +20,14 @@ const Auth = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    name: "",
+    fullName: "",
+    rfidCode: "",
+    studentId: "",
+    matricNumber: "",
+    department: "",
+    level: "",
   });
+  const [signInType, setSignInType] = useState<"email" | "rfid">("email");
 
   useEffect(() => {
     // Check if user is already logged in
@@ -40,19 +47,53 @@ const Auth = () => {
     });
   };
 
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      let authData;
+      
+      if (signInType === "rfid") {
+        // First, find user by RFID code
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .eq('rfid_code', formData.rfidCode)
+          .single();
 
-      if (error) throw error;
+        if (profileError || !profileData) {
+          throw new Error("RFID code not found. Please check your RFID code.");
+        }
 
-      if (data.user) {
+        // Get the user's email from auth.users via the user_id
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(profileData.user_id);
+        
+        if (userError || !userData.user) {
+          throw new Error("User account not found.");
+        }
+
+        authData = await supabase.auth.signInWithPassword({
+          email: userData.user.email!,
+          password: formData.password,
+        });
+      } else {
+        authData = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+      }
+
+      if (authData.error) throw authData.error;
+
+      if (authData.data.user) {
         toast({
           title: "Welcome back!",
           description: "You have been successfully signed in.",
@@ -74,6 +115,7 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    // Validation
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -94,6 +136,27 @@ const Auth = () => {
       return;
     }
 
+    // Check if RFID code already exists
+    try {
+      const { data: existingRfid } = await supabase
+        .from('profiles')
+        .select('rfid_code')
+        .eq('rfid_code', formData.rfidCode)
+        .single();
+
+      if (existingRfid) {
+        toast({
+          title: "RFID Code Already Exists",
+          description: "This RFID code is already registered. Please use a different one.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+    } catch (error) {
+      // RFID code doesn't exist, which is good
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -101,7 +164,12 @@ const Auth = () => {
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
-            name: formData.name,
+            full_name: formData.fullName,
+            rfid_code: formData.rfidCode,
+            student_id: formData.studentId,
+            matric_number: formData.matricNumber,
+            department: formData.department,
+            level: formData.level,
           },
         },
       });
@@ -113,7 +181,6 @@ const Auth = () => {
           title: "Account Created Successfully!",
           description: "Please check your email to confirm your account.",
         });
-        // Don't navigate yet - wait for email confirmation
       }
     } catch (error: any) {
       toast({
@@ -158,17 +225,57 @@ const Auth = () => {
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      name="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                    />
+                    <Label>Sign In Method</Label>
+                    <div className="flex space-x-2">
+                      <Button
+                        type="button"
+                        variant={signInType === "email" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSignInType("email")}
+                        className="flex-1"
+                      >
+                        Email
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={signInType === "rfid" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSignInType("rfid")}
+                        className="flex-1"
+                      >
+                        RFID
+                      </Button>
+                    </div>
                   </div>
+
+                  {signInType === "email" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="signin-email">Email</Label>
+                      <Input
+                        id="signin-email"
+                        name="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="signin-rfid">RFID Code</Label>
+                      <Input
+                        id="signin-rfid"
+                        name="rfidCode"
+                        type="text"
+                        placeholder="Enter your RFID code"
+                        value={formData.rfidCode}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label htmlFor="signin-password">Password</Label>
                     <div className="relative">
@@ -205,17 +312,96 @@ const Auth = () => {
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Label htmlFor="signup-fullname">Full Name</Label>
                     <Input
-                      id="signup-name"
-                      name="name"
+                      id="signup-fullname"
+                      name="fullName"
                       type="text"
                       placeholder="Enter your full name"
-                      value={formData.name}
+                      value={formData.fullName}
                       onChange={handleInputChange}
                       required
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-rfid">RFID Code</Label>
+                    <Input
+                      id="signup-rfid"
+                      name="rfidCode"
+                      type="text"
+                      placeholder="Enter your RFID code"
+                      value={formData.rfidCode}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-studentid">Student ID</Label>
+                    <Input
+                      id="signup-studentid"
+                      name="studentId"
+                      type="text"
+                      placeholder="Enter your student ID"
+                      value={formData.studentId}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-matric">Matric Number</Label>
+                    <Input
+                      id="signup-matric"
+                      name="matricNumber"
+                      type="text"
+                      placeholder="Enter your matric number"
+                      value={formData.matricNumber}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-department">Department</Label>
+                    <Select onValueChange={(value) => handleSelectChange("department", value)} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Computer Science">Computer Science</SelectItem>
+                        <SelectItem value="Information Technology">Information Technology</SelectItem>
+                        <SelectItem value="Software Engineering">Software Engineering</SelectItem>
+                        <SelectItem value="Electrical Engineering">Electrical Engineering</SelectItem>
+                        <SelectItem value="Mechanical Engineering">Mechanical Engineering</SelectItem>
+                        <SelectItem value="Civil Engineering">Civil Engineering</SelectItem>
+                        <SelectItem value="Business Administration">Business Administration</SelectItem>
+                        <SelectItem value="Accounting">Accounting</SelectItem>
+                        <SelectItem value="Economics">Economics</SelectItem>
+                        <SelectItem value="Mathematics">Mathematics</SelectItem>
+                        <SelectItem value="Physics">Physics</SelectItem>
+                        <SelectItem value="Chemistry">Chemistry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-level">Level</Label>
+                    <Select onValueChange={(value) => handleSelectChange("level", value)} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="100">100 Level</SelectItem>
+                        <SelectItem value="200">200 Level</SelectItem>
+                        <SelectItem value="300">300 Level</SelectItem>
+                        <SelectItem value="400">400 Level</SelectItem>
+                        <SelectItem value="500">500 Level</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input
@@ -228,6 +414,7 @@ const Auth = () => {
                       required
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
                     <div className="relative">
@@ -255,6 +442,7 @@ const Auth = () => {
                       </Button>
                     </div>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="confirm-password">Confirm Password</Label>
                     <Input
@@ -267,6 +455,7 @@ const Auth = () => {
                       required
                     />
                   </div>
+
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Creating Account..." : "Create Account"}
                   </Button>
@@ -277,7 +466,7 @@ const Auth = () => {
         </Card>
 
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Demo RFID cards are pre-loaded for testing.</p>
+          <p>RFID cards will be used for attendance scanning.</p>
           <p>Contact admin for access permissions.</p>
         </div>
       </div>
