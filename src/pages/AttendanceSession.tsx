@@ -88,11 +88,44 @@ const AttendanceSession = () => {
 
       if (recordsError) throw recordsError;
 
-      const formattedRecords = records.map((record: any) => ({
-        student: record.students,
-        check_in_time: new Date(record.check_in_time).toLocaleTimeString(),
-        rfid_code: record.students.rfid_code
-      }));
+      const formattedRecords: AttendanceRecord[] = await Promise.all(
+        (records || []).map(async (record: any) => {
+          let student = record.students as Student | null;
+
+          if (!student) {
+            // Fallback: resolve student from rfid_scan
+            const { data: fallbackStudent } = await supabase
+              .from('students')
+              .select('*')
+              .eq('rfid_code', record.rfid_scan)
+              .maybeSingle();
+
+            if (fallbackStudent) {
+              student = fallbackStudent as Student;
+              // Try to backfill student_id on the record for future queries
+              await supabase
+                .from('attendance_records')
+                .update({ student_id: fallbackStudent.id })
+                .eq('id', record.id);
+            } else {
+              // Graceful placeholder if not resolvable
+              student = {
+                id: 'unknown',
+                name: 'Unknown Student',
+                matric_number: 'N/A',
+                rfid_code: record.rfid_scan,
+                department: 'N/A',
+              } as Student;
+            }
+          }
+
+          return {
+            student,
+            check_in_time: new Date(record.check_in_time).toLocaleTimeString(),
+            rfid_code: student.rfid_code,
+          } as AttendanceRecord;
+        })
+      );
 
       setRecentScans(formattedRecords);
       setPresentCount(records.length);
@@ -138,13 +171,36 @@ const AttendanceSession = () => {
         },
         async (payload) => {
           // Fetch the student data for the new record
-          const { data: studentData, error } = await supabase
-            .from('students')
-            .select('*')
-            .eq('id', payload.new.student_id)
-            .single();
+          let studentData = null as Student | null;
 
-          if (!error && studentData) {
+          if (payload.new.student_id) {
+            const { data, error } = await supabase
+              .from('students')
+              .select('*')
+              .eq('id', payload.new.student_id)
+              .maybeSingle();
+            if (!error) studentData = data as Student | null;
+          }
+
+          // Fallback: resolve by RFID if student_id is missing
+          if (!studentData && payload.new.rfid_scan) {
+            const { data: fallbackStudent } = await supabase
+              .from('students')
+              .select('*')
+              .eq('rfid_code', payload.new.rfid_scan)
+              .maybeSingle();
+
+            if (fallbackStudent) {
+              studentData = fallbackStudent as Student;
+              // Try to backfill the record for future queries
+              await supabase
+                .from('attendance_records')
+                .update({ student_id: fallbackStudent.id })
+                .eq('id', payload.new.id);
+            }
+          }
+
+          if (studentData) {
             const newRecord: AttendanceRecord = {
               student: studentData,
               check_in_time: new Date(payload.new.check_in_time).toLocaleTimeString(),
@@ -158,6 +214,21 @@ const AttendanceSession = () => {
               title: "Check-in Successful",
               description: `${studentData.name} (${studentData.matric_number}) checked in`,
             });
+          } else {
+            // Show a minimal entry so the feed reflects activity
+            const newRecord: AttendanceRecord = {
+              student: {
+                id: 'unknown',
+                name: 'Unknown Student',
+                matric_number: 'N/A',
+                rfid_code: payload.new.rfid_scan,
+                department: 'N/A',
+              },
+              check_in_time: new Date(payload.new.check_in_time).toLocaleTimeString(),
+              rfid_code: payload.new.rfid_scan,
+            };
+            setRecentScans(prev => [newRecord, ...prev]);
+            setPresentCount(prev => prev + 1);
           }
         }
       )

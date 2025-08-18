@@ -18,23 +18,23 @@ export type Database = {
         Row: {
           check_in_time: string
           id: string
-          rfid_scan: boolean | null
-          session_id: string
-          student_id: string
+          rfid_scan: string | null
+          session_id: string | null
+          student_id: string | null
         }
         Insert: {
           check_in_time?: string
           id?: string
-          rfid_scan?: boolean | null
-          session_id: string
-          student_id: string
+          rfid_scan?: string | null
+          session_id?: string | null
+          student_id?: string | null
         }
         Update: {
           check_in_time?: string
           id?: string
-          rfid_scan?: boolean | null
-          session_id?: string
-          student_id?: string
+          rfid_scan?: string | null
+          session_id?: string | null
+          student_id?: string | null
         }
         Relationships: [
           {
