@@ -108,14 +108,32 @@ const AttendanceSession = () => {
                 .update({ student_id: fallbackStudent.id })
                 .eq('id', record.id);
             } else {
-              // Graceful placeholder if not resolvable
-              student = {
-                id: 'unknown',
-                name: 'Unknown Student',
-                matric_number: 'N/A',
-                rfid_code: record.rfid_scan,
-                department: 'N/A',
-              } as Student;
+              // Check profiles table for user who created account with this RFID
+              const { data: profileStudent } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('rfid_code', record.rfid_scan)
+                .maybeSingle();
+
+              if (profileStudent) {
+                // Create student object from profile data
+                student = {
+                  id: profileStudent.id,
+                  name: profileStudent.full_name,
+                  matric_number: profileStudent.matric_number,
+                  rfid_code: profileStudent.rfid_code,
+                  department: profileStudent.department,
+                } as Student;
+              } else {
+                // Graceful placeholder if not resolvable
+                student = {
+                  id: 'unknown',
+                  name: 'Unknown Student',
+                  matric_number: 'N/A',
+                  rfid_code: record.rfid_scan,
+                  department: 'N/A',
+                } as Student;
+              }
             }
           }
 
@@ -197,6 +215,24 @@ const AttendanceSession = () => {
                 .from('attendance_records')
                 .update({ student_id: fallbackStudent.id })
                 .eq('id', payload.new.id);
+            } else {
+              // Check profiles table for user who created account with this RFID
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('rfid_code', payload.new.rfid_scan)
+                .maybeSingle();
+
+              if (profileData) {
+                // Create student object from profile data
+                studentData = {
+                  id: profileData.id,
+                  name: profileData.full_name,
+                  matric_number: profileData.matric_number,
+                  rfid_code: profileData.rfid_code,
+                  department: profileData.department,
+                } as Student;
+              }
             }
           }
 
