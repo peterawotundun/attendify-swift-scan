@@ -96,7 +96,7 @@ serve(async (req) => {
       .insert({
         session_id: session.id,
         student_id: student.id,
-        rfid_scan: true
+        rfid_scan: rfid_code
       })
       .select('*')
       .single()
