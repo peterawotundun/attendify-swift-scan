@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Edit, Trash, Play } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Plus, Edit, Trash } from "lucide-react";
+import { Link } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -21,9 +21,10 @@ const ClassScheduling = () => {
   const [time, setTime] = useState("");
   const [maxStudents, setMaxStudents] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Classes fetched from DB
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   // Fetch classes from DB
   const fetchClasses = async () => {
@@ -38,13 +39,6 @@ const ClassScheduling = () => {
     fetchClasses();
   }, []);
 
-  // Delete all attendance sessions in DB
-  const handleDeleteAllSessions = async () => {
-    await supabase.from("attendance_sessions").delete().neq("id", "");
-    fetchClasses();
-    alert("All sessions deleted from Supabase!");
-  };
-
   // Handler for create class
   const handleCreateClass = async () => {
     setIsLoading(true);
@@ -54,6 +48,7 @@ const ClassScheduling = () => {
       setIsLoading(false);
       return;
     }
+    // Insert into Supabase
     const { data, error } = await supabase
       .from("classes")
       .insert({
@@ -69,6 +64,7 @@ const ClassScheduling = () => {
     if (error) {
       setError(error.message || "Failed to create class");
     } else {
+      // Success: reload classes, clear form
       fetchClasses();
       setCourseName("");
       setCourseCode("");
@@ -77,34 +73,6 @@ const ClassScheduling = () => {
       setMaxStudents("");
     }
     setIsLoading(false);
-  };
-
-  // Start session for a class
-  const handleStartSession = async (classId) => {
-    // Create a unique session code
-    const sessionCode = `ATD-${Date.now()}`;
-    const { data, error } = await supabase
-      .from("attendance_sessions")
-      .insert({
-        class_id: classId,
-        session_code: sessionCode,
-        is_active: true,
-        start_time: new Date().toISOString(),
-      })
-      .select("*")
-      .single();
-    if (!error) {
-      // Redirect to session page
-      navigate(`/session/${data.id}`);
-    } else {
-      alert("Couldn't start session: " + error.message);
-    }
-  };
-
-  // Delete a class
-  const handleDeleteClass = async (id) => {
-    await supabase.from("classes").delete().eq("id", id);
-    fetchClasses();
   };
 
   return (
@@ -123,7 +91,6 @@ const ClassScheduling = () => {
               <p className="text-muted-foreground">Manage your course schedules and sessions</p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleDeleteAllSessions}>Delete All Sessions</Button>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -133,45 +100,71 @@ const ClassScheduling = () => {
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Plus className="mr-2 h-5 w-5" />
-                  Create New Class
+                  Create New Schedule
                 </CardTitle>
                 <CardDescription>Set up a new class schedule</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="course-name">Course Name</Label>
-                  <Input id="course-name" value={courseName} onChange={e => setCourseName(e.target.value)} />
+                  <Input
+                    id="course-name"
+                    placeholder="e.g., Data Structures"
+                    value={courseName}
+                    onChange={e => setCourseName(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="course-code">Course Code</Label>
-                  <Input id="course-code" value={courseCode} onChange={e => setCourseCode(e.target.value)} />
+                  <Input
+                    id="course-code"
+                    placeholder="e.g., CS201"
+                    value={courseCode}
+                    onChange={e => setCourseCode(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="room">Room</Label>
-                  <Input id="room" value={room} onChange={e => setRoom(e.target.value)} />
+                  <Input
+                    id="room"
+                    placeholder="e.g., A101"
+                    value={room}
+                    onChange={e => setRoom(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="time">Time</Label>
-                  <Input id="time" value={time} onChange={e => setTime(e.target.value)} />
+                  <Input
+                    id="time"
+                    placeholder="e.g., 10:00 AM - 11:30 AM"
+                    value={time}
+                    onChange={e => setTime(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="max-students">Maximum Students</Label>
-                  <Input id="max-students" type="number" value={maxStudents} onChange={e => setMaxStudents(e.target.value)} />
+                  <Input
+                    id="max-students"
+                    type="number"
+                    placeholder="e.g., 50"
+                    value={maxStudents}
+                    onChange={e => setMaxStudents(e.target.value)}
+                  />
                 </div>
                 {error && <div className="text-red-500">{error}</div>}
                 <Button className="w-full btn-primary" onClick={handleCreateClass} disabled={isLoading}>
-                  {isLoading ? "Creating..." : "Create Class"}
+                  {isLoading ? "Creating..." : "Create Schedule"}
                 </Button>
               </CardContent>
             </Card>
           </div>
 
-          {/* Existing Classes */}
+          {/* Existing Schedules */}
           <div className="lg:col-span-2">
             <Card className="card-elevated">
               <CardHeader>
-                <CardTitle>Existing Classes</CardTitle>
-                <CardDescription>Manage your current courses</CardDescription>
+                <CardTitle>Existing Schedules</CardTitle>
+                <CardDescription>Manage your current course schedules</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -193,7 +186,10 @@ const ClassScheduling = () => {
                           </div>
                         </div>
                         <div className="flex space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => handleDeleteClass(schedule.id)}>
+                          <Button variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm">
                             <Trash className="h-4 w-4" />
                           </Button>
                         </div>
@@ -202,9 +198,10 @@ const ClassScheduling = () => {
                         <div className="text-sm text-muted-foreground">
                           Next session: {schedule.time}
                         </div>
-                        <Button className="btn-success" size="sm" onClick={() => handleStartSession(schedule.id)}>
-                          <Play className="mr-2 h-4 w-4" />
-                          Start Session
+                        <Button className="btn-success" size="sm" asChild>
+                          <Link to={`/session/${schedule.id}`}>
+                            Start Session
+                          </Link>
                         </Button>
                       </div>
                     </div>
