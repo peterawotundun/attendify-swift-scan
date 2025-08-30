@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { StatusIndicator } from "@/components/StatusIndicator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Users, Clock, Download } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
 interface Student {
   id: string;
@@ -25,6 +26,7 @@ interface AttendanceRecord {
 
 const AttendanceSession = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [sessionData, setSessionData] = useState<any>(null);
   const [classData, setClassData] = useState<any>(null);
@@ -32,6 +34,7 @@ const AttendanceSession = () => {
   const [recentScans, setRecentScans] = useState<AttendanceRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isEndingSession, setIsEndingSession] = useState(false);
 
   // Fetch session and class data
   useEffect(() => {
@@ -275,6 +278,112 @@ const AttendanceSession = () => {
     };
   }, [sessionData, toast]);
 
+  // End session functionality
+  const handleEndSession = async () => {
+    if (!sessionData) return;
+    
+    setIsEndingSession(true);
+    try {
+      const { error } = await supabase
+        .from("attendance_sessions")
+        .update({ 
+          is_active: false,
+          end_time: new Date().toISOString()
+        })
+        .eq("id", sessionData.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Session Ended",
+        description: "Attendance session has been successfully ended",
+      });
+
+      // Navigate back to lecturer dashboard
+      navigate("/lecturer");
+    } catch (error) {
+      console.error("Error ending session:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEndingSession(false);
+    }
+  };
+
+  // Export to Excel functionality
+  const handleExport = () => {
+    if (!recentScans.length || !sessionData || !classData) {
+      toast({
+        title: "No Data",
+        description: "No attendance data to export",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare data for Excel export
+    const exportData = recentScans.map((scan, index) => ({
+      'S/N': index + 1,
+      'Student Name': scan.student.name,
+      'Matric Number': scan.student.matric_number,
+      'Department': scan.student.department,
+      'RFID Code': scan.rfid_code,
+      'Check-in Time': scan.check_in_time,
+      'Status': 'Present'
+    }));
+
+    // Add session info at the top
+    const sessionInfo = [
+      { 'S/N': 'CLASS INFORMATION', 'Student Name': '', 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Class Name:', 'Student Name': classData.name, 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Course Code:', 'Student Name': classData.code, 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Room:', 'Student Name': classData.room, 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Time:', 'Student Name': classData.time, 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Session Code:', 'Student Name': sessionData.session_code, 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Date:', 'Student Name': new Date().toLocaleDateString(), 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Total Present:', 'Student Name': presentCount.toString(), 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Total Enrolled:', 'Student Name': classData.total_students.toString(), 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'Attendance Rate:', 'Student Name': `${Math.round((presentCount / classData.total_students) * 100)}%`, 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': '', 'Student Name': '', 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+      { 'S/N': 'ATTENDANCE RECORDS', 'Student Name': '', 'Matric Number': '', 'Department': '', 'RFID Code': '', 'Check-in Time': '', 'Status': '' },
+    ];
+
+    const finalData = [...sessionInfo, ...exportData];
+
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(finalData);
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { width: 8 },   // S/N
+      { width: 25 },  // Student Name
+      { width: 15 },  // Matric Number
+      { width: 20 },  // Department
+      { width: 15 },  // RFID Code
+      { width: 15 },  // Check-in Time
+      { width: 10 }   // Status
+    ];
+
+    // Add the worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance Report');
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const filename = `${classData.code}_${sessionData.session_code}_Attendance_${timestamp}.xlsx`;
+
+    // Save the file
+    XLSX.writeFile(workbook, filename);
+
+    toast({
+      title: "Export Successful",
+      description: `Attendance report exported as ${filename}`,
+    });
+  };
+
   // This function is called by the RFID hardware via the edge function
   // The edge function handles all the logic and database updates
 
@@ -402,12 +511,22 @@ const AttendanceSession = () => {
                   <CardDescription>Real-time student check-ins</CardDescription>
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleExport}
+                    disabled={recentScans.length === 0}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Export
                   </Button>
-                  <Button className="btn-success" size="sm">
-                    End Session
+                  <Button 
+                    className="btn-success" 
+                    size="sm"
+                    onClick={handleEndSession}
+                    disabled={isEndingSession || !sessionData?.is_active}
+                  >
+                    {isEndingSession ? "Ending..." : "End Session"}
                   </Button>
                 </div>
               </CardHeader>
