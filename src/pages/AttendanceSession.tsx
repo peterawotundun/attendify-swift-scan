@@ -55,7 +55,7 @@ const AttendanceSession = () => {
             classes (*)
           `)
           .eq('id', id)
-          .single();
+          .maybeSingle();
       } else {
         // If it's not a UUID, try to find by session_code or get the first active session
         sessionQuery = supabase
@@ -64,9 +64,9 @@ const AttendanceSession = () => {
             *,
             classes (*)
           `)
-          .eq('session_code', `ATD-2024-00${id}`)
+          .or(`session_code.eq.${id},session_code.eq.ATD-2024-00${id}`)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
       }
 
       const { data: session, error: sessionError } = await sessionQuery;
