@@ -25,7 +25,7 @@ serve(async (req) => {
       )
     }
 
-    const { rfid_code, session_code, api_key } = await req.json()
+    const { rfid_code, api_key } = await req.json()
 
     // Validate API key (you can set this in Supabase secrets)
     const validApiKey = Deno.env.get('RFID_API_KEY') || 'your-hardware-api-key'
@@ -37,10 +37,31 @@ serve(async (req) => {
       )
     }
 
-    console.log('RFID scan request:', { rfid_code, session_code })
+    console.log('RFID scan request:', { rfid_code })
+
+    // Find the latest active session
+    const { data: latestSession, error: sessionError } = await supabase
+      .from('attendance_sessions')
+      .select('*, classes(*)')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!latestSession) {
+      console.log('No active session found')
+      return new Response(
+        JSON.stringify({ error: 'No active session found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Find student by RFID code (try students table first, then profiles)
     let student = null;
+    let studentName = "Unknown student";
+    let matric_number = null;
+    let department = null;
+
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('*')
@@ -49,6 +70,9 @@ serve(async (req) => {
 
     if (studentData) {
       student = studentData;
+      studentName = studentData.name;
+      matric_number = studentData.matric_number;
+      department = studentData.department;
     } else {
       // Check profiles table
       const { data: profileData, error: profileError } = await supabase
@@ -73,78 +97,58 @@ serve(async (req) => {
 
         if (!insertError && newStudent) {
           student = newStudent;
+          studentName = newStudent.name;
+          matric_number = newStudent.matric_number;
+          department = newStudent.department;
+        }
+      } else {
+        // Create unknown student record
+        const { data: unknownStudent, error: insertError } = await supabase
+          .from('students')
+          .insert({
+            name: "Unknown student",
+            matric_number: `UNKNOWN-${rfid_code}`,
+            rfid_code: rfid_code,
+            department: "Unknown",
+            email: null
+          })
+          .select()
+          .single()
+
+        if (!insertError && unknownStudent) {
+          student = unknownStudent;
         }
       }
     }
 
-    if (!student) {
-      console.log('Student not found for RFID:', rfid_code)
-      return new Response(
-        JSON.stringify({ error: 'Student not found', rfid_code }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Find active session by session code or class code
-    let session = null;
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('attendance_sessions')
-      .select('*, classes(*)')
-      .eq('session_code', session_code)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (sessionData) {
-      session = sessionData;
-    } else {
-      // Try to find by class code if session_code didn't work
-      const { data: classSessions, error: classError } = await supabase
-        .from('attendance_sessions')
-        .select('*, classes!inner(*)')
-        .eq('classes.code', session_code)
-        .eq('is_active', true)
-        .limit(1)
+    // Check if student already checked in (only if we have a valid student)
+    if (student) {
+      const { data: existingRecord } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('session_id', latestSession.id)
+        .eq('student_id', student.id)
         .maybeSingle()
 
-      if (classSessions) {
-        session = classSessions;
+      if (existingRecord) {
+        console.log('Student already checked in:', studentName)
+        return new Response(
+          JSON.stringify({ 
+            error: 'Already checked in', 
+            student: studentName,
+            check_in_time: existingRecord.check_in_time 
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-    }
-
-    if (!session) {
-      console.log('Active session not found:', session_code)
-      return new Response(
-        JSON.stringify({ error: 'Active session not found', session_code }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Check if student already checked in
-    const { data: existingRecord } = await supabase
-      .from('attendance_records')
-      .select('*')
-      .eq('session_id', session.id)
-      .eq('student_id', student.id)
-      .maybeSingle()
-
-    if (existingRecord) {
-      console.log('Student already checked in:', student.name)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Already checked in', 
-          student: student.name,
-          check_in_time: existingRecord.check_in_time 
-        }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
     }
 
     // Record attendance
     const { data: attendanceRecord, error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
-        session_id: session.id,
-        student_id: student.id,
+        session_id: latestSession.id,
+        student_id: student ? student.id : null,
         rfid_scan: rfid_code
       })
       .select('*')
@@ -159,8 +163,8 @@ serve(async (req) => {
     }
 
     console.log('Attendance recorded successfully:', {
-      student: student.name,
-      session: session_code,
+      student: studentName,
+      session: latestSession.session_code,
       time: attendanceRecord.check_in_time
     })
 
@@ -168,12 +172,12 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         student: {
-          name: student.name,
-          matric_number: student.matric_number,
-          department: student.department
+          name: studentName,
+          matric_number: matric_number,
+          department: department
         },
         check_in_time: attendanceRecord.check_in_time,
-        session_code: session_code
+        session_code: latestSession.session_code
       }),
       {
         status: 200,
