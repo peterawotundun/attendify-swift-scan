@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusIndicator } from "@/components/StatusIndicator";
+import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { 
   Users, 
   BookOpen, 
@@ -9,9 +10,13 @@ import {
   TrendingUp, 
   Download, 
   Settings,
-  ArrowLeft,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  LayoutDashboard,
+  UserPlus,
+  Calendar,
+  FileText,
+  Shield
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -44,30 +49,59 @@ const AdminDashboard = () => {
     { id: 4, type: "export", message: "Monthly attendance report exported", user: "Admin", time: "2 hours ago" }
   ];
 
+  const sidebarItems = [
+    { title: "Dashboard", icon: LayoutDashboard, href: "/admin" },
+    { title: "User Management", icon: Users, href: "/admin/users" },
+    { title: "Class Management", icon: BookOpen, href: "/admin/classes" },
+    { title: "Schedule", icon: Calendar, href: "/admin/schedule" },
+    { title: "Reports", icon: FileText, href: "/admin/reports" },
+    { title: "Security", icon: Shield, href: "/admin/security" },
+    { title: "Settings", icon: Settings, href: "/admin/settings" },
+  ];
+
   return (
-    <div className="min-h-screen bg-muted/30 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" asChild>
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-              <p className="text-muted-foreground">System overview and management</p>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <Sidebar>
+          <SidebarContent>
+            <div className="p-4">
+              <div className="flex items-center" style={{ gap: '3px' }}>
+                <img src="/lovable-uploads/2e759af7-37bc-4e5f-9c0b-3aaed75ff12f.png" alt="Attendify Logo" className="h-8 w-auto" />
+                <h2 className="text-lg font-semibold text-primary">Attendify</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">Admin Portal</p>
             </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <StatusIndicator connected={true} label="System Status" />
-            <Button variant="outline">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Button>
-          </div>
-        </div>
+            <SidebarMenu>
+              {sidebarItems.map((item, index) => (
+                <SidebarMenuItem key={index}>
+                  <SidebarMenuButton asChild>
+                    <Link to={item.href} className="flex items-center space-x-3 p-3">
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarContent>
+        </Sidebar>
+
+        <main className="flex-1 p-6 bg-muted/30">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+                <p className="text-muted-foreground">System overview and management</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <StatusIndicator connected={true} label="System Status" />
+                <Button variant="outline">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Button>
+              </div>
+            </div>
 
         {/* Quick Stats */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -251,9 +285,11 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
-        </div>
+            </div>
+          </div>
+        </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
