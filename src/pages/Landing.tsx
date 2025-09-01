@@ -11,8 +11,8 @@ const Landing = () => {
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-2">
-              <img src="/lovable-uploads/2e759af7-37bc-4e5f-9c0b-3aaed75ff12f.png" alt="Attendify Logo" className="h-10 w-auto" />
+            <div className="flex items-center" style={{ gap: '3px' }}>
+              <img src="/lovable-uploads/2e759af7-37bc-4e5f-9c0b-3aaed75ff12f.png" alt="Attendify Logo" className="h-12 w-auto" />
               <h1 className="text-xl font-bold text-primary">Attendify</h1>
             </div>
             <Navigation />
@@ -116,8 +116,8 @@ const Landing = () => {
       {/* Footer */}
       <footer className="py-12 border-t">
         <div className="container mx-auto px-4 text-center">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <img src="/lovable-uploads/2e759af7-37bc-4e5f-9c0b-3aaed75ff12f.png" alt="Attendify Logo" className="h-8 w-auto" />
+          <div className="flex items-center justify-center mb-4" style={{ gap: '3px' }}>
+            <img src="/lovable-uploads/2e759af7-37bc-4e5f-9c0b-3aaed75ff12f.png" alt="Attendify Logo" className="h-10 w-auto" />
             <h3 className="text-lg font-semibold text-primary">Attendify</h3>
           </div>
           <p className="text-muted-foreground">
