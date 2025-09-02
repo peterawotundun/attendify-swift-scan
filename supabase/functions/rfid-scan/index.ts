@@ -28,13 +28,9 @@ serve(async (req) => {
     const body = await req.json()
     const { rfid_code, api_key } = body
     
-    // Normalize RFID code by removing spaces and converting to uppercase
-    const normalizedRfidCode = rfid_code ? rfid_code.replace(/\s+/g, '').toUpperCase() : null
-    
     console.log('Received request body:', body)
-    console.log('Original RFID code:', rfid_code, 'Normalized:', normalizedRfidCode)
 
-    // Validate API key (you can set this in Supabase secrets)
+    // Validate API key
     const validApiKey = Deno.env.get('RFID_API_KEY') || 'your-hardware-api-key'
     if (api_key !== validApiKey) {
       console.log('Invalid API key provided:', api_key, 'Expected:', validApiKey)
@@ -44,150 +40,43 @@ serve(async (req) => {
       )
     }
 
-    console.log('RFID scan request:', { rfid_code, normalizedRfidCode })
+    console.log('RFID scan request:', { rfid_code })
 
-    // Get the latest session ID from attendance_sessions (most recent)
-    const { data: latestSession, error: sessionError } = await supabase
-      .from('attendance_sessions')
-      .select('*, classes(*)')
-      .order('created_at', { ascending: false })
+    // Check if student already checked in today by looking for existing records with this RFID
+    const { data: existingRecord } = await supabase
+      .from('attendance_records')
+      .select('*, students(*), attendance_sessions(*, classes(*))')
+      .eq('rfid_scan', rfid_code)
+      .gte('check_in_time', new Date().toISOString().split('T')[0]) // Today's records
+      .order('check_in_time', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    console.log('Session query result:', { latestSession, sessionError })
-
-    if (sessionError) {
-      console.error('Session query error:', sessionError)
+    if (existingRecord) {
+      console.log('Student already checked in today')
       return new Response(
-        JSON.stringify({ error: 'Database error fetching session' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: 'Already checked in today', 
+          student: existingRecord.students?.name || 'Unknown',
+          check_in_time: existingRecord.check_in_time 
+        }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    if (!latestSession) {
-      console.log('No session found in database')
-      return new Response(
-        JSON.stringify({ error: 'No session found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('Using latest session:', latestSession.session_code, 'Session ID:', latestSession.id)
-
-    // Find student by RFID code (check students table first, then profiles)
-    let student = null;
-    let studentName = "Unknown student";
-    let matric_number = null;
-    let department = null;
-
-    console.log('Looking for student with RFID code:', normalizedRfidCode)
-
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
-      .select('*')
-      .eq('rfid_code', normalizedRfidCode)
-      .maybeSingle()
-
-    console.log('Student query result:', { studentData, studentError })
-
-    if (studentData) {
-      student = studentData;
-      studentName = studentData.name;
-      matric_number = studentData.matric_number;
-      department = studentData.department;
-      console.log('Found existing student:', studentName)
-    } else {
-      // Check profiles table for RFID code
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('rfid_code', normalizedRfidCode)
-        .maybeSingle()
-
-      console.log('Profile query result:', { profileData, profileError })
-
-      if (profileData) {
-        // Create student record from profile data
-        const { data: newStudent, error: insertError } = await supabase
-          .from('students')
-          .upsert({
-            name: profileData.full_name,
-            matric_number: profileData.matric_number,
-            rfid_code: normalizedRfidCode,
-            department: profileData.department,
-            email: null
-          })
-          .select()
-          .single()
-
-        if (!insertError && newStudent) {
-          student = newStudent;
-          studentName = newStudent.name;
-          matric_number = newStudent.matric_number;
-          department = newStudent.department;
-          console.log('Created student from profile:', studentName)
-        }
-      }
-      
-      // If still no student found, create unknown student record
-      if (!student) {
-        const { data: unknownStudent, error: insertError } = await supabase
-          .from('students')
-          .insert({
-            name: "Unknown student",
-            matric_number: `UNKNOWN-${normalizedRfidCode}`,
-            rfid_code: normalizedRfidCode,
-            department: "Unknown",
-            email: null
-          })
-          .select()
-          .single()
-
-        if (!insertError && unknownStudent) {
-          student = unknownStudent;
-          studentName = "Unknown student";
-          console.log('Created unknown student for RFID:', normalizedRfidCode)
-        }
-      }
-    }
-
-    // Check if student already checked in (only if we have a valid student)
-    if (student) {
-      const { data: existingRecord } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .eq('session_id', latestSession.id)
-        .eq('student_id', student.id)
-        .maybeSingle()
-
-      if (existingRecord) {
-        console.log('Student already checked in:', studentName)
-        return new Response(
-          JSON.stringify({ 
-            error: 'Already checked in', 
-            student: studentName,
-            check_in_time: existingRecord.check_in_time 
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-    }
-
-    // Record attendance
-    console.log('Attempting to record attendance with:', {
-      session_id: latestSession.id,
-      student_id: student ? student.id : null,
-      rfid_scan: normalizedRfidCode
-    })
+    // Record attendance - trigger will auto-set session_id and student_id
+    console.log('Recording attendance for RFID:', rfid_code)
 
     const { data: attendanceRecord, error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
-        session_id: latestSession.id,
-        student_id: student ? student.id : null,
-        rfid_scan: normalizedRfidCode
+        rfid_scan: rfid_code // Trigger will normalize this and set session_id/student_id
       })
-      .select('*')
+      .select(`
+        *,
+        students(*),
+        attendance_sessions(*, classes(*))
+      `)
       .single()
 
     console.log('Attendance record result:', { attendanceRecord, attendanceError })
@@ -201,8 +90,8 @@ serve(async (req) => {
     }
 
     console.log('Attendance recorded successfully:', {
-      student: studentName,
-      session: latestSession.session_code,
+      student: attendanceRecord.students?.name || 'Unknown',
+      session: attendanceRecord.attendance_sessions?.session_code || 'Unknown',
       time: attendanceRecord.check_in_time
     })
 
@@ -210,12 +99,13 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         student: {
-          name: studentName,
-          matric_number: matric_number,
-          department: department
+          name: attendanceRecord.students?.name || 'Unknown student',
+          matric_number: attendanceRecord.students?.matric_number || null,
+          department: attendanceRecord.students?.department || null
         },
         check_in_time: attendanceRecord.check_in_time,
-        session_code: latestSession.session_code
+        session_code: attendanceRecord.attendance_sessions?.session_code || null,
+        class_name: attendanceRecord.attendance_sessions?.classes?.name || null
       }),
       {
         status: 200,

@@ -208,6 +208,10 @@ export type Database = {
         Args: { course_code: string }
         Returns: string
       }
+      normalize_rfid: {
+        Args: { rfid: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
