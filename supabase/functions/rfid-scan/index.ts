@@ -28,54 +28,56 @@ serve(async (req) => {
     const body = await req.json()
     const { rfid_code, api_key } = body
     
-    console.log('Received request body:', body)
+    console.log('Received RFID scan:', { rfid_code, api_key })
 
     // Validate API key
     const validApiKey = Deno.env.get('RFID_API_KEY') || 'your-hardware-api-key'
     if (api_key !== validApiKey) {
-      console.log('Invalid API key provided:', api_key, 'Expected:', validApiKey)
+      console.log('Invalid API key provided:', api_key)
       return new Response(
         JSON.stringify({ error: 'Invalid API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('RFID scan request:', { rfid_code })
+    if (!rfid_code) {
+      return new Response(
+        JSON.stringify({ error: 'RFID code is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // Check if student already checked in today by looking for existing records with this RFID
-    const { data: existingRecord } = await supabase
+    // Check for existing attendance record with same RFID in recent time (prevent duplicates)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    const { data: recentRecord } = await supabase
       .from('attendance_records')
-      .select('*, students(*), attendance_sessions(*, classes(*))')
+      .select('*')
       .eq('rfid_scan', rfid_code)
-      .gte('check_in_time', new Date().toISOString().split('T')[0]) // Today's records
-      .order('check_in_time', { ascending: false })
-      .limit(1)
+      .gte('check_in_time', fiveMinutesAgo)
       .maybeSingle()
 
-    if (existingRecord) {
-      console.log('Student already checked in today')
+    if (recentRecord) {
+      console.log('Duplicate scan detected within 5 minutes')
       return new Response(
         JSON.stringify({ 
-          error: 'Already checked in today', 
-          student: existingRecord.students?.name || 'Unknown',
-          check_in_time: existingRecord.check_in_time 
+          error: 'Already scanned recently',
+          check_in_time: recentRecord.check_in_time 
         }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Record attendance - trigger will auto-set session_id and student_id
+    // Insert attendance record - trigger will handle setting session_id and student_id
     console.log('Recording attendance for RFID:', rfid_code)
-
     const { data: attendanceRecord, error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
-        rfid_scan: rfid_code // Trigger will normalize this and set session_id/student_id
+        rfid_scan: rfid_code
       })
       .select(`
         *,
-        students(*),
-        attendance_sessions(*, classes(*))
+        students!inner(name, matric_number, department),
+        attendance_sessions!inner(session_code, classes!inner(name, code, room))
       `)
       .single()
 
@@ -89,24 +91,28 @@ serve(async (req) => {
       )
     }
 
-    console.log('Attendance recorded successfully:', {
-      student: attendanceRecord.students?.name || 'Unknown',
-      session: attendanceRecord.attendance_sessions?.session_code || 'Unknown',
-      time: attendanceRecord.check_in_time
-    })
+    // Return complete details
+    const response = {
+      success: true,
+      student: {
+        name: attendanceRecord.students?.name || 'Unknown Student',
+        matric_number: attendanceRecord.students?.matric_number || 'Unknown',
+        department: attendanceRecord.students?.department || 'Unknown'
+      },
+      session: {
+        code: attendanceRecord.attendance_sessions?.session_code || 'Unknown Session',
+        class_name: attendanceRecord.attendance_sessions?.classes?.name || 'Unknown Class',
+        class_code: attendanceRecord.attendance_sessions?.classes?.code || 'Unknown',
+        room: attendanceRecord.attendance_sessions?.classes?.room || 'Unknown'
+      },
+      check_in_time: attendanceRecord.check_in_time,
+      rfid_code: attendanceRecord.rfid_scan
+    }
+
+    console.log('Successful attendance recorded:', response)
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        student: {
-          name: attendanceRecord.students?.name || 'Unknown student',
-          matric_number: attendanceRecord.students?.matric_number || null,
-          department: attendanceRecord.students?.department || null
-        },
-        check_in_time: attendanceRecord.check_in_time,
-        session_code: attendanceRecord.attendance_sessions?.session_code || null,
-        class_name: attendanceRecord.attendance_sessions?.classes?.name || null
-      }),
+      JSON.stringify(response),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
