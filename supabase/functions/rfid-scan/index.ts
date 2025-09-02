@@ -39,8 +39,11 @@ serve(async (req) => {
 
     console.log('RFID scan request:', { rfid_code })
 
-    // Find the latest active session
-    const { data: latestSession, error: sessionError } = await supabase
+    // Find the latest session (prioritize active sessions first)
+    let latestSession = null;
+    
+    // First try to get the latest active session
+    const { data: activeSession, error: activeSessionError } = await supabase
       .from('attendance_sessions')
       .select('*, classes(*)')
       .eq('is_active', true)
@@ -48,10 +51,26 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle()
 
+    if (activeSession) {
+      latestSession = activeSession;
+      console.log('Found active session:', latestSession.session_code)
+    } else {
+      // If no active session, get the most recent session
+      const { data: recentSession, error: recentSessionError } = await supabase
+        .from('attendance_sessions')
+        .select('*, classes(*)')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      
+      latestSession = recentSession;
+      console.log('Found recent session:', latestSession?.session_code || 'none')
+    }
+
     if (!latestSession) {
-      console.log('No active session found')
+      console.log('No session found in database')
       return new Response(
-        JSON.stringify({ error: 'No active session found' }),
+        JSON.stringify({ error: 'No session found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
