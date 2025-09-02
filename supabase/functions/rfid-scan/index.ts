@@ -42,33 +42,13 @@ serve(async (req) => {
 
     console.log('RFID scan request:', { rfid_code })
 
-    // Find the latest session (prioritize active sessions first)
-    let latestSession = null;
-    
-    // First try to get the latest active session
-    const { data: activeSession, error: activeSessionError } = await supabase
+    // Get the latest session ID from attendance_sessions (most recent)
+    const { data: latestSession, error: sessionError } = await supabase
       .from('attendance_sessions')
       .select('*, classes(*)')
-      .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    if (activeSession) {
-      latestSession = activeSession;
-      console.log('Found active session:', latestSession.session_code)
-    } else {
-      // If no active session, get the most recent session
-      const { data: recentSession, error: recentSessionError } = await supabase
-        .from('attendance_sessions')
-        .select('*, classes(*)')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      
-      latestSession = recentSession;
-      console.log('Found recent session:', latestSession?.session_code || 'none')
-    }
 
     if (!latestSession) {
       console.log('No session found in database')
@@ -78,7 +58,9 @@ serve(async (req) => {
       )
     }
 
-    // Find student by RFID code (try students table first, then profiles)
+    console.log('Using latest session:', latestSession.session_code)
+
+    // Find student by RFID code (check students table first, then profiles)
     let student = null;
     let studentName = "Unknown student";
     let matric_number = null;
@@ -101,15 +83,17 @@ serve(async (req) => {
       department = studentData.department;
       console.log('Found existing student:', studentName)
     } else {
-      // Check profiles table
+      // Check profiles table for RFID code
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('rfid_code', rfid_code)
         .maybeSingle()
 
+      console.log('Profile query result:', { profileData, profileError })
+
       if (profileData) {
-        // Create/update student record from profile
+        // Create student record from profile data
         const { data: newStudent, error: insertError } = await supabase
           .from('students')
           .upsert({
@@ -127,9 +111,12 @@ serve(async (req) => {
           studentName = newStudent.name;
           matric_number = newStudent.matric_number;
           department = newStudent.department;
+          console.log('Created student from profile:', studentName)
         }
-      } else {
-        // Create unknown student record
+      }
+      
+      // If still no student found, create unknown student record
+      if (!student) {
         const { data: unknownStudent, error: insertError } = await supabase
           .from('students')
           .insert({
@@ -144,6 +131,8 @@ serve(async (req) => {
 
         if (!insertError && unknownStudent) {
           student = unknownStudent;
+          studentName = "Unknown student";
+          console.log('Created unknown student for RFID:', rfid_code)
         }
       }
     }
