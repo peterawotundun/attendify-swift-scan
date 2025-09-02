@@ -50,6 +50,16 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle()
 
+    console.log('Session query result:', { latestSession, sessionError })
+
+    if (sessionError) {
+      console.error('Session query error:', sessionError)
+      return new Response(
+        JSON.stringify({ error: 'Database error fetching session' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (!latestSession) {
       console.log('No session found in database')
       return new Response(
@@ -58,7 +68,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Using latest session:', latestSession.session_code)
+    console.log('Using latest session:', latestSession.session_code, 'Session ID:', latestSession.id)
 
     // Find student by RFID code (check students table first, then profiles)
     let student = null;
@@ -160,6 +170,12 @@ serve(async (req) => {
     }
 
     // Record attendance
+    console.log('Attempting to record attendance with:', {
+      session_id: latestSession.id,
+      student_id: student ? student.id : null,
+      rfid_scan: rfid_code
+    })
+
     const { data: attendanceRecord, error: attendanceError } = await supabase
       .from('attendance_records')
       .insert({
@@ -170,10 +186,12 @@ serve(async (req) => {
       .select('*')
       .single()
 
+    console.log('Attendance record result:', { attendanceRecord, attendanceError })
+
     if (attendanceError) {
       console.error('Error recording attendance:', attendanceError)
       return new Response(
-        JSON.stringify({ error: 'Failed to record attendance' }),
+        JSON.stringify({ error: 'Failed to record attendance', details: attendanceError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
