@@ -25,12 +25,15 @@ serve(async (req) => {
       )
     }
 
-    const { rfid_code, api_key } = await req.json()
+    const body = await req.json()
+    const { rfid_code, api_key } = body
+    
+    console.log('Received request body:', body)
 
     // Validate API key (you can set this in Supabase secrets)
     const validApiKey = Deno.env.get('RFID_API_KEY') || 'your-hardware-api-key'
     if (api_key !== validApiKey) {
-      console.log('Invalid API key provided:', api_key)
+      console.log('Invalid API key provided:', api_key, 'Expected:', validApiKey)
       return new Response(
         JSON.stringify({ error: 'Invalid API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -81,17 +84,22 @@ serve(async (req) => {
     let matric_number = null;
     let department = null;
 
+    console.log('Looking for student with RFID code:', rfid_code)
+
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('*')
       .eq('rfid_code', rfid_code)
       .maybeSingle()
 
+    console.log('Student query result:', { studentData, studentError })
+
     if (studentData) {
       student = studentData;
       studentName = studentData.name;
       matric_number = studentData.matric_number;
       department = studentData.department;
+      console.log('Found existing student:', studentName)
     } else {
       // Check profiles table
       const { data: profileData, error: profileError } = await supabase
