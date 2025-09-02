@@ -28,7 +28,11 @@ serve(async (req) => {
     const body = await req.json()
     const { rfid_code, api_key } = body
     
+    // Normalize RFID code by removing spaces and converting to uppercase
+    const normalizedRfidCode = rfid_code ? rfid_code.replace(/\s+/g, '').toUpperCase() : null
+    
     console.log('Received request body:', body)
+    console.log('Original RFID code:', rfid_code, 'Normalized:', normalizedRfidCode)
 
     // Validate API key (you can set this in Supabase secrets)
     const validApiKey = Deno.env.get('RFID_API_KEY') || 'your-hardware-api-key'
@@ -40,7 +44,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('RFID scan request:', { rfid_code })
+    console.log('RFID scan request:', { rfid_code, normalizedRfidCode })
 
     // Get the latest session ID from attendance_sessions (most recent)
     const { data: latestSession, error: sessionError } = await supabase
@@ -76,12 +80,12 @@ serve(async (req) => {
     let matric_number = null;
     let department = null;
 
-    console.log('Looking for student with RFID code:', rfid_code)
+    console.log('Looking for student with RFID code:', normalizedRfidCode)
 
     const { data: studentData, error: studentError } = await supabase
       .from('students')
       .select('*')
-      .eq('rfid_code', rfid_code)
+      .eq('rfid_code', normalizedRfidCode)
       .maybeSingle()
 
     console.log('Student query result:', { studentData, studentError })
@@ -97,7 +101,7 @@ serve(async (req) => {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('rfid_code', rfid_code)
+        .eq('rfid_code', normalizedRfidCode)
         .maybeSingle()
 
       console.log('Profile query result:', { profileData, profileError })
@@ -109,7 +113,7 @@ serve(async (req) => {
           .upsert({
             name: profileData.full_name,
             matric_number: profileData.matric_number,
-            rfid_code: profileData.rfid_code,
+            rfid_code: normalizedRfidCode,
             department: profileData.department,
             email: null
           })
@@ -131,8 +135,8 @@ serve(async (req) => {
           .from('students')
           .insert({
             name: "Unknown student",
-            matric_number: `UNKNOWN-${rfid_code}`,
-            rfid_code: rfid_code,
+            matric_number: `UNKNOWN-${normalizedRfidCode}`,
+            rfid_code: normalizedRfidCode,
             department: "Unknown",
             email: null
           })
@@ -142,7 +146,7 @@ serve(async (req) => {
         if (!insertError && unknownStudent) {
           student = unknownStudent;
           studentName = "Unknown student";
-          console.log('Created unknown student for RFID:', rfid_code)
+          console.log('Created unknown student for RFID:', normalizedRfidCode)
         }
       }
     }
@@ -173,7 +177,7 @@ serve(async (req) => {
     console.log('Attempting to record attendance with:', {
       session_id: latestSession.id,
       student_id: student ? student.id : null,
-      rfid_scan: rfid_code
+      rfid_scan: normalizedRfidCode
     })
 
     const { data: attendanceRecord, error: attendanceError } = await supabase
@@ -181,7 +185,7 @@ serve(async (req) => {
       .insert({
         session_id: latestSession.id,
         student_id: student ? student.id : null,
-        rfid_scan: rfid_code
+        rfid_scan: normalizedRfidCode
       })
       .select('*')
       .single()
