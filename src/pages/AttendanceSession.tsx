@@ -284,7 +284,8 @@ const AttendanceSession = () => {
     
     setIsEndingSession(true);
     try {
-      const { error } = await supabase
+      // End the session
+      const { error: sessionError } = await supabase
         .from("attendance_sessions")
         .update({ 
           is_active: false,
@@ -292,11 +293,19 @@ const AttendanceSession = () => {
         })
         .eq("id", sessionData.id);
 
-      if (error) throw error;
+      if (sessionError) throw sessionError;
+
+      // Delete the class
+      const { error: classError } = await supabase
+        .from("classes")
+        .delete()
+        .eq("id", sessionData.class_id);
+
+      if (classError) throw classError;
 
       toast({
         title: "Session Ended",
-        description: "Attendance session has been successfully ended",
+        description: "Attendance session ended and class removed",
       });
 
       // Navigate back to lecturer dashboard
