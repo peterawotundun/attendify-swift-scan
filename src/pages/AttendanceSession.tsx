@@ -20,7 +20,7 @@ interface Student {
 
 interface AttendanceRecord {
   student: Student;
-  check_in_time: string;
+  checkin_time: string;
   rfid_code: string;
 }
 
@@ -87,7 +87,7 @@ const AttendanceSession = () => {
           students (*)
         `)
         .eq('session_id', session.id)
-        .order('check_in_time', { ascending: false });
+        .order('checkin_time', { ascending: false });
 
       if (recordsError) throw recordsError;
 
@@ -142,7 +142,7 @@ const AttendanceSession = () => {
 
           return {
             student,
-            check_in_time: new Date(record.check_in_time).toLocaleTimeString(),
+            checkin_time: new Date(record.checkin_time).toLocaleTimeString(),
             rfid_code: student.rfid_code,
           } as AttendanceRecord;
         })
@@ -242,7 +242,7 @@ const AttendanceSession = () => {
           if (studentData) {
             const newRecord: AttendanceRecord = {
               student: studentData,
-              check_in_time: new Date(payload.new.check_in_time).toLocaleTimeString(),
+              checkin_time: new Date(payload.new.checkin_time).toLocaleTimeString(),
               rfid_code: studentData.rfid_code
             };
 
@@ -263,7 +263,7 @@ const AttendanceSession = () => {
                 rfid_code: payload.new.rfid_scan,
                 department: 'N/A',
               },
-              check_in_time: new Date(payload.new.check_in_time).toLocaleTimeString(),
+              checkin_time: new Date(payload.new.checkin_time).toLocaleTimeString(),
               rfid_code: payload.new.rfid_scan,
             };
             setRecentScans(prev => [newRecord, ...prev]);
@@ -331,7 +331,7 @@ const AttendanceSession = () => {
       'Matric Number': scan.student.matric_number,
       'Department': scan.student.department,
       'RFID Code': scan.rfid_code,
-      'Check-in Time': scan.check_in_time,
+      'Check-in Time': scan.checkin_time,
       'Status': 'Present'
     }));
 
@@ -545,7 +545,7 @@ const AttendanceSession = () => {
                   ) : (
                     recentScans.map((scan, index) => (
                       <div 
-                        key={`${scan.student.id}-${scan.check_in_time}`} 
+                        key={`${scan.student.id}-${scan.checkin_time}`}
                         className={`flex items-center space-x-4 p-4 rounded-lg border transition-all duration-300 ${
                           index === 0 ? 'bg-success/10 border-success/20' : 'bg-card'
                         }`}
@@ -563,7 +563,7 @@ const AttendanceSession = () => {
                         <div className="text-right">
                           <div className="flex items-center space-x-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{scan.check_in_time}</span>
+                            <span className="text-sm font-medium">{scan.checkin_time}</span>
                           </div>
                           {index === 0 && (
                             <Badge className="mt-1 bg-success text-success-foreground">
