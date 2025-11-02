@@ -29,6 +29,7 @@ const ClassScheduling = () => {
       const { data, error } = await supabase
         .from("classes")
         .select("*")
+        .eq("is_active", true)
         .order("created_at", { ascending: false });
       
       if (error) throw error;

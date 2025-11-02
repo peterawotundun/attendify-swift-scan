@@ -295,17 +295,17 @@ const AttendanceSession = () => {
 
       if (sessionError) throw sessionError;
 
-      // Delete the class
+      // Mark class as inactive (soft delete)
       const { error: classError } = await supabase
         .from("classes")
-        .delete()
+        .update({ is_active: false })
         .eq("id", sessionData.class_id);
 
       if (classError) throw classError;
 
       toast({
         title: "Session Ended",
-        description: "Attendance session ended and class removed",
+        description: "Attendance session ended and class archived",
       });
 
       // Navigate back to lecturer dashboard

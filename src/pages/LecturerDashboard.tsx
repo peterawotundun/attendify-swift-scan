@@ -30,6 +30,7 @@ const LecturerDashboard = () => {
       const { data, error } = await supabase
         .from("classes")
         .select("*")
+        .eq("is_active", true)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
@@ -62,7 +63,8 @@ const LecturerDashboard = () => {
               id
             )
           )
-        `);
+        `)
+        .eq("is_active", true);
 
       if (classesError) throw classesError;
 

@@ -16,21 +16,21 @@ export type Database = {
     Tables: {
       attendance_records: {
         Row: {
-          check_in_time: string
+          checkin_time: string
           id: string
           rfid_scan: string | null
           session_id: string | null
           student_id: string | null
         }
         Insert: {
-          check_in_time?: string
+          checkin_time?: string
           id?: string
           rfid_scan?: string | null
           session_id?: string | null
           student_id?: string | null
         }
         Update: {
-          check_in_time?: string
+          checkin_time?: string
           id?: string
           rfid_scan?: string | null
           session_id?: string | null
@@ -57,27 +57,33 @@ export type Database = {
         Row: {
           class_id: string
           created_at: string
+          display_message: string | null
           end_time: string | null
           id: string
           is_active: boolean
+          lecturer_id: string | null
           session_code: string
           start_time: string
         }
         Insert: {
           class_id: string
           created_at?: string
+          display_message?: string | null
           end_time?: string | null
           id?: string
           is_active?: boolean
+          lecturer_id?: string | null
           session_code: string
           start_time?: string
         }
         Update: {
           class_id?: string
           created_at?: string
+          display_message?: string | null
           end_time?: string | null
           id?: string
           is_active?: boolean
+          lecturer_id?: string | null
           session_code?: string
           start_time?: string
         }
@@ -89,6 +95,13 @@ export type Database = {
             referencedRelation: "classes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attendance_sessions_lecturer_id_fkey"
+            columns: ["lecturer_id"]
+            isOneToOne: false
+            referencedRelation: "lecturers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       classes: {
@@ -96,6 +109,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          is_active: boolean
           lecturer_id: string | null
           name: string
           room: string
@@ -107,6 +121,7 @@ export type Database = {
           code: string
           created_at?: string
           id?: string
+          is_active?: boolean
           lecturer_id?: string | null
           name: string
           room: string
@@ -118,12 +133,73 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           lecturer_id?: string | null
           name?: string
           room?: string
           time?: string
           total_students?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      lecturer_schedule: {
+        Row: {
+          class_id: string | null
+          created_at: string | null
+          id: string
+          lecturer_id: string | null
+          scheduled_date: string
+        }
+        Insert: {
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          lecturer_id?: string | null
+          scheduled_date: string
+        }
+        Update: {
+          class_id?: string | null
+          created_at?: string | null
+          id?: string
+          lecturer_id?: string | null
+          scheduled_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecturer_schedule_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecturer_schedule_lecturer_id_fkey"
+            columns: ["lecturer_id"]
+            isOneToOne: false
+            referencedRelation: "lecturers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecturers: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -204,14 +280,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_session_code: {
-        Args: { course_code: string }
-        Returns: string
-      }
-      normalize_rfid: {
-        Args: { rfid: string }
-        Returns: string
-      }
+      end_session: { Args: { session_id: string }; Returns: Json }
+      generate_session_code: { Args: { course_code: string }; Returns: string }
+      get_active_session: { Args: never; Returns: Json }
+      mark_attendance: { Args: { rfid_input: string }; Returns: Json }
+      normalize_rfid: { Args: { rfid: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
