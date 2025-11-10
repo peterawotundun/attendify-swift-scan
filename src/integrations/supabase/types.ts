@@ -143,6 +143,42 @@ export type Database = {
         }
         Relationships: []
       }
+      course_enrollments: {
+        Row: {
+          class_id: string
+          enrolled_at: string | null
+          id: string
+          student_id: string
+        }
+        Insert: {
+          class_id: string
+          enrolled_at?: string | null
+          id?: string
+          student_id: string
+        }
+        Update: {
+          class_id?: string
+          enrolled_at?: string | null
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lecturer_schedule: {
         Row: {
           class_id: string | null
@@ -202,6 +238,64 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          class_id: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          notification_type: string
+          schedule_id: string | null
+          scheduled_time: string | null
+          student_id: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          notification_type: string
+          schedule_id?: string | null
+          scheduled_time?: string | null
+          student_id: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          notification_type?: string
+          schedule_id?: string | null
+          scheduled_time?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "lecturer_schedule"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -283,6 +377,10 @@ export type Database = {
       end_session: { Args: { session_id: string }; Returns: Json }
       generate_session_code: { Args: { course_code: string }; Returns: string }
       get_active_session: { Args: never; Returns: Json }
+      get_attendance_percentage: {
+        Args: { p_class_id: string; p_student_id: string }
+        Returns: number
+      }
       mark_attendance: { Args: { rfid_input: string }; Returns: Json }
       normalize_rfid: { Args: { rfid: string }; Returns: string }
     }

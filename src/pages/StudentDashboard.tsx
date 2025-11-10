@@ -20,19 +20,63 @@ const StudentDashboard = () => {
   const { toast } = useToast();
   const [classes, setClasses] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [overallAttendance, setOverallAttendance] = useState(0);
+  const [studentId, setStudentId] = useState(null);
 
-  // Fetch all available classes
-  const fetchClasses = async () => {
+  // Get current student from profile
+  const getCurrentStudent = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("student_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile?.student_id) {
+        const { data: student } = await supabase
+          .from("students")
+          .select("id")
+          .eq("id", profile.student_id)
+          .single();
+        
+        return student?.id;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching student:", error);
+      return null;
+    }
+  };
+
+  // Fetch enrolled classes for student
+  const fetchClasses = async (studentId) => {
+    if (!studentId) return;
+    
     try {
       const { data, error } = await supabase
-        .from("classes")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .from("course_enrollments")
+        .select(`
+          id,
+          class_id,
+          classes (
+            id,
+            name,
+            code,
+            time,
+            room,
+            total_students
+          )
+        `)
+        .eq("student_id", studentId);
       
       if (error) throw error;
-      setClasses(data || []);
+      const enrolledClasses = data?.map(e => e.classes) || [];
+      setClasses(enrolledClasses);
     } catch (error) {
       console.error("Error fetching classes:", error);
       toast({
@@ -43,46 +87,77 @@ const StudentDashboard = () => {
     }
   };
 
-  // Calculate student's attendance statistics
-  const fetchAttendanceStats = async () => {
+  // Calculate student's real attendance statistics
+  const fetchAttendanceStats = async (studentId) => {
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Get all classes with their attendance data
-      const { data: classesData, error: classesError } = await supabase
-        .from("classes")
+      const { data: enrollments } = await supabase
+        .from("course_enrollments")
         .select(`
-          id,
-          name,
-          attendance_sessions (
+          class_id,
+          classes (
             id,
-            attendance_records (
-              id,
-              student_id
-            )
+            name,
+            code
           )
-        `);
+        `)
+        .eq("student_id", studentId);
 
-      if (classesError) throw classesError;
+      if (!enrollments || enrollments.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-      // For demo purposes, generate mock attendance data since we don't have real student data yet
-      const stats = classesData?.map(cls => {
-        const totalSessions = cls.attendance_sessions.length || 1;
-        // Generate random but realistic attendance percentage
-        const attendanceRate = Math.floor(Math.random() * 30) + 70; // 70-100%
-        const presentSessions = Math.round((attendanceRate / 100) * totalSessions);
-        
-        return {
-          subject: cls.name,
-          attendance: attendanceRate,
-          total: totalSessions,
-          present: presentSessions
-        };
-      }) || [];
+      const stats = await Promise.all(
+        enrollments.map(async (enrollment) => {
+          const classId = enrollment.class_id;
+          const className = enrollment.classes.name;
+          
+          // Get total sessions for this class
+          const { data: sessions } = await supabase
+            .from("attendance_sessions")
+            .select("id")
+            .eq("class_id", classId);
+          
+          const totalSessions = sessions?.length || 0;
+          
+          // Get attended sessions for this student
+          const { data: attended } = await supabase
+            .from("attendance_records")
+            .select(`
+              id,
+              session_id,
+              attendance_sessions!inner(class_id)
+            `)
+            .eq("student_id", studentId)
+            .eq("attendance_sessions.class_id", classId);
+          
+          const presentSessions = attended?.length || 0;
+          const attendancePercentage = totalSessions > 0 
+            ? Math.round((presentSessions / totalSessions) * 100)
+            : 0;
+
+          return {
+            subject: className,
+            attendance: attendancePercentage,
+            total: totalSessions,
+            present: presentSessions,
+            meetsRequirement: attendancePercentage >= 75
+          };
+        })
+      );
 
       setAttendanceStats(stats);
       
       // Calculate overall attendance
       if (stats.length > 0) {
-        const overall = Math.round(stats.reduce((acc, stat) => acc + stat.attendance, 0) / stats.length);
+        const overall = Math.round(
+          stats.reduce((acc, stat) => acc + stat.attendance, 0) / stats.length
+        );
         setOverallAttendance(overall);
       }
     } catch (error) {
@@ -92,9 +167,57 @@ const StudentDashboard = () => {
     }
   };
 
+  // Fetch notifications for student
+  const fetchNotifications = async (studentId) => {
+    if (!studentId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notificationId);
+      
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+      );
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
   useEffect(() => {
-    fetchClasses();
-    fetchAttendanceStats();
+    const initDashboard = async () => {
+      const id = await getCurrentStudent();
+      setStudentId(id);
+      if (id) {
+        await Promise.all([
+          fetchClasses(id),
+          fetchAttendanceStats(id),
+          fetchNotifications(id)
+        ]);
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    initDashboard();
   }, []);
 
   return (
@@ -209,6 +332,22 @@ const StudentDashboard = () => {
                         </div>
                       </div>
                       <Progress value={record.attendance} className="h-2" />
+                      {record.attendance < 75 && (
+                        <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-md">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                          <p className="text-xs text-destructive">
+                            Below 75% requirement - {75 - record.attendance}% more needed to qualify for exams
+                          </p>
+                        </div>
+                      )}
+                      {record.attendance >= 75 && record.attendance < 90 && (
+                        <div className="flex items-center gap-2 p-2 bg-success/10 rounded-md">
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <p className="text-xs text-success">
+                            Meets 75% requirement for exam qualification
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -252,11 +391,42 @@ const StudentDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No new notifications</p>
-                  <p className="text-sm">Check back later for updates</p>
-                </div>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No new notifications</p>
+                    <p className="text-sm">Check back later for updates</p>
+                  </div>
+                ) : (
+                  notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-3 rounded-lg border ${
+                        notification.is_read ? "bg-muted/50" : "bg-primary/5 border-primary/20"
+                      }`}
+                      onClick={() => !notification.is_read && markAsRead(notification.id)}
+                    >
+                      <div className="flex items-start gap-2">
+                        {notification.notification_type === "schedule" && (
+                          <Calendar className="h-4 w-4 text-primary mt-0.5" />
+                        )}
+                        {notification.notification_type === "reminder" && (
+                          <Clock className="h-4 w-4 text-warning mt-0.5" />
+                        )}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{notification.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(notification.created_at).toLocaleDateString()} at{" "}
+                            {new Date(notification.created_at).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        {!notification.is_read && (
+                          <div className="h-2 w-2 bg-primary rounded-full mt-1.5" />
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
 

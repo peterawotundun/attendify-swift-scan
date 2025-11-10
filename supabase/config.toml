@@ -2,3 +2,6 @@ project_id = "fijovbmtczlhvmfmuuse"
 
 [functions.rfid-scan]
 verify_jwt = false
+
+[functions.send-reminders]
+verify_jwt = false
