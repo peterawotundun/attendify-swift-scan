@@ -18,11 +18,14 @@ import {
   FileText,
   Shield
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const { userRole, loading: authLoading } = useAuth();
   const [systemStats, setSystemStats] = useState({
     totalStudents: 0,
     totalLecturers: 0,
@@ -110,6 +113,12 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
+    // Check role authorization
+    if (!authLoading && userRole && userRole !== 'admin') {
+      navigate(userRole === 'student' ? '/student' : '/lecturer');
+      return;
+    }
+    
     const loadData = async () => {
       setLoading(true);
       await Promise.all([fetchSystemStats(), fetchAttendanceStats()]);
@@ -117,7 +126,7 @@ const AdminDashboard = () => {
     };
     
     loadData();
-  }, []);
+  }, [authLoading, userRole, navigate]);
 
   const attendanceTrends = [
     { period: "This Week", rate: 87, change: "+3%" },

@@ -1,10 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Navigation, AuthButtons } from "@/components/ui/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { CreditCard, Clock, Shield, BarChart3 } from "lucide-react";
+import { CreditCard, Clock, Shield, BarChart3, GraduationCap, BookOpen, UserCog } from "lucide-react";
 import heroImage from "@/assets/university-classroom.jpg";
+import { useNavigate } from "react-router-dom";
 
 const Landing = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -33,12 +36,32 @@ const Landing = () => {
               Transform your classroom with RFID-enabled student ID cards for seamless, 
               real-time attendance tracking that saves time and improves accuracy.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="btn-primary text-lg px-8 py-3">
-                Get Started
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+              <Button 
+                size="lg" 
+                className="btn-primary text-lg px-8 py-3 flex items-center justify-center gap-2"
+                onClick={() => navigate('/auth?role=student')}
+              >
+                <GraduationCap className="h-5 w-5" />
+                Student Login
               </Button>
-              <Button size="lg" variant="outline" className="btn-secondary text-lg px-8 py-3">
-                Watch Demo
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="btn-secondary text-lg px-8 py-3 flex items-center justify-center gap-2"
+                onClick={() => navigate('/auth?role=lecturer')}
+              >
+                <BookOpen className="h-5 w-5" />
+                Lecturer Login
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="btn-secondary text-lg px-8 py-3 flex items-center justify-center gap-2"
+                onClick={() => navigate('/auth?role=admin')}
+              >
+                <UserCog className="h-5 w-5" />
+                Admin Login
               </Button>
             </div>
             

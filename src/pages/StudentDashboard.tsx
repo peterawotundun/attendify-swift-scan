@@ -12,12 +12,15 @@ import {
   AlertCircle,
   ArrowLeft
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const StudentDashboard = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, userRole, loading: authLoading } = useAuth();
   const [classes, setClasses] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -203,6 +206,12 @@ const StudentDashboard = () => {
   };
 
   useEffect(() => {
+    // Check role authorization
+    if (!authLoading && userRole && userRole !== 'student') {
+      navigate(userRole === 'lecturer' ? '/lecturer' : '/admin');
+      return;
+    }
+    
     const initDashboard = async () => {
       const id = await getCurrentStudent();
       setStudentId(id);
@@ -218,7 +227,7 @@ const StudentDashboard = () => {
     };
     
     initDashboard();
-  }, []);
+  }, [authLoading, userRole, navigate]);
 
   return (
     <div className="min-h-screen bg-muted/30 p-6">

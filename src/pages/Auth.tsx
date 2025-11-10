@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import { Link } from "react-router-dom";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const role = searchParams.get('role') as 'student' | 'lecturer' | 'admin' || 'student';
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -34,7 +36,20 @@ const Auth = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        // Get user role and redirect accordingly
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        if (roleData?.role === 'lecturer') {
+          navigate("/lecturer");
+        } else if (roleData?.role === 'admin') {
+          navigate("/admin");
+        } else {
+          navigate("/student");
+        }
       }
     };
     checkUser();
@@ -94,11 +109,25 @@ const Auth = () => {
       if (authData.error) throw authData.error;
 
       if (authData.data.user) {
+        // Get user role and redirect accordingly
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', authData.data.user.id)
+          .single();
+        
         toast({
           title: "Welcome back!",
           description: "You have been successfully signed in.",
         });
-        navigate("/");
+
+        if (roleData?.role === 'lecturer') {
+          navigate("/lecturer");
+        } else if (roleData?.role === 'admin') {
+          navigate("/admin");
+        } else {
+          navigate("/student");
+        }
       }
     } catch (error: any) {
       toast({
@@ -170,6 +199,7 @@ const Auth = () => {
             matric_number: formData.matricNumber,
             department: formData.department,
             level: formData.level,
+            role: role,
           },
         },
       });
@@ -210,9 +240,9 @@ const Auth = () => {
 
         <Card className="card-elevated">
           <CardHeader className="text-center">
-            <CardTitle>Welcome</CardTitle>
+            <CardTitle>Welcome {role.charAt(0).toUpperCase() + role.slice(1)}</CardTitle>
             <CardDescription>
-              Sign in to your account or create a new one
+              Sign in to your account or create a new one as {role}
             </CardDescription>
           </CardHeader>
           <CardContent>

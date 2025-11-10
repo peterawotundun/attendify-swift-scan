@@ -16,10 +16,12 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const LecturerDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { userRole, loading: authLoading } = useAuth();
   const [classes, setClasses] = useState([]);
   const [attendanceStats, setAttendanceStats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,9 +126,14 @@ const LecturerDashboard = () => {
   };
 
   useEffect(() => {
+    // Check role authorization
+    if (!authLoading && userRole && userRole !== 'lecturer') {
+      navigate(userRole === 'student' ? '/student' : '/admin');
+      return;
+    }
     fetchClasses();
     fetchAttendanceStats();
-  }, []);
+  }, [authLoading, userRole, navigate]);
 
   return (
     <SidebarProvider>

@@ -369,6 +369,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -381,11 +402,22 @@ export type Database = {
         Args: { p_class_id: string; p_student_id: string }
         Returns: number
       }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       mark_attendance: { Args: { rfid_input: string }; Returns: Json }
       normalize_rfid: { Args: { rfid: string }; Returns: string }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "lecturer" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -512,6 +544,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "lecturer", "student"],
+    },
   },
 } as const
