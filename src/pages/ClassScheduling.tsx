@@ -22,6 +22,8 @@ const ClassScheduling = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
+  const [editingClass, setEditingClass] = useState<any>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Fetch classes from DB
   const fetchClasses = async () => {
@@ -152,6 +154,118 @@ const ClassScheduling = () => {
     }
   };
 
+  // Edit a class
+  const handleEditClass = (classData: any) => {
+    setEditingClass(classData);
+    setIsEditMode(true);
+    setCourseName(classData.name);
+    setCourseCode(classData.code);
+    setRoom(classData.room);
+    setTime(classData.time);
+    setMaxStudents(classData.total_students.toString());
+  };
+
+  const handleUpdateClass = async () => {
+    setIsLoading(true);
+    setError("");
+    
+    if (!courseName || !courseCode || !room || !time || !maxStudents) {
+      setError("All fields are required.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("classes")
+        .update({
+          name: courseName,
+          code: courseCode,
+          room,
+          time,
+          total_students: parseInt(maxStudents),
+        })
+        .eq("id", editingClass.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Class updated successfully",
+      });
+      
+      fetchClasses();
+      cancelEdit();
+    } catch (error) {
+      console.error("Error updating class:", error);
+      setError(error.message || "Failed to update class");
+      toast({
+        title: "Error", 
+        description: error.message || "Failed to update class",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setIsEditMode(false);
+    setEditingClass(null);
+    setCourseName("");
+    setCourseCode("");
+    setRoom("");
+    setTime("");
+    setMaxStudents("");
+    setError("");
+  };
+
+  // Cancel a class - notify students
+  const handleCancelClass = async (classData: any) => {
+    try {
+      // Get enrolled students
+      const { data: enrollments } = await supabase
+        .from("course_enrollments")
+        .select("student_id")
+        .eq("class_id", classData.id);
+
+      // Create notifications for all enrolled students
+      if (enrollments && enrollments.length > 0) {
+        const notifications = enrollments.map(enrollment => ({
+          student_id: enrollment.student_id,
+          class_id: classData.id,
+          message: `Class cancelled: ${classData.name} (${classData.code}) scheduled for ${classData.time} in ${classData.room}`,
+          notification_type: 'cancellation',
+          created_at: new Date().toISOString(),
+        }));
+
+        await supabase.from("notifications").insert(notifications);
+      }
+
+      // Mark class as inactive
+      const { error } = await supabase
+        .from("classes")
+        .update({ is_active: false })
+        .eq("id", classData.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Class Cancelled",
+        description: `${classData.name} cancelled and students notified`,
+      });
+      
+      fetchClasses();
+    } catch (error) {
+      console.error("Error cancelling class:", error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel class",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Delete a class
   const handleDeleteClass = async (id) => {
     try {
@@ -198,10 +312,12 @@ const ClassScheduling = () => {
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Plus className="mr-2 h-5 w-5" />
-                  Create New Class
+                  {isEditMode ? <Edit className="mr-2 h-5 w-5" /> : <Plus className="mr-2 h-5 w-5" />}
+                  {isEditMode ? "Edit Class" : "Create New Class"}
                 </CardTitle>
-                <CardDescription>Set up a new class schedule</CardDescription>
+                <CardDescription>
+                  {isEditMode ? "Update class information" : "Set up a new class schedule"}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -225,9 +341,20 @@ const ClassScheduling = () => {
                   <Input id="max-students" type="number" value={maxStudents} onChange={e => setMaxStudents(e.target.value)} />
                 </div>
                 {error && <div className="text-red-500">{error}</div>}
-                <Button className="w-full btn-primary" onClick={handleCreateClass} disabled={isLoading}>
-                  {isLoading ? "Creating..." : "Create Class"}
-                </Button>
+                {isEditMode ? (
+                  <div className="flex space-x-2">
+                    <Button className="flex-1 btn-primary" onClick={handleUpdateClass} disabled={isLoading}>
+                      {isLoading ? "Updating..." : "Update Class"}
+                    </Button>
+                    <Button variant="outline" className="flex-1" onClick={cancelEdit}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button className="w-full btn-primary" onClick={handleCreateClass} disabled={isLoading}>
+                    {isLoading ? "Creating..." : "Create Class"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -259,6 +386,12 @@ const ClassScheduling = () => {
                           </div>
                         </div>
                         <div className="flex space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEditClass(schedule)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleCancelClass(schedule)}>
+                            Cancel Class
+                          </Button>
                           <Button variant="outline" size="sm" onClick={() => handleDeleteClass(schedule.id)}>
                             <Trash className="h-4 w-4" />
                           </Button>

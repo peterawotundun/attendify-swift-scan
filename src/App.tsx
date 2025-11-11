@@ -10,6 +10,8 @@ import Registration from "./pages/Registration";
 import LecturerDashboard from "./pages/LecturerDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminUsers from "./pages/AdminUsers";
+import AdminReports from "./pages/AdminReports";
 import ClassScheduling from "./pages/ClassScheduling";
 import AttendanceSession from "./pages/AttendanceSession";
 import NotFound from "./pages/NotFound";
@@ -30,6 +32,8 @@ const App = () => (
             <Route path="/lecturer" element={<LecturerDashboard />} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/reports" element={<AdminReports />} />
             <Route path="/schedule" element={<ClassScheduling />} />
             <Route path="/session/:id" element={<AttendanceSession />} />
             <Route path="*" element={<NotFound />} />

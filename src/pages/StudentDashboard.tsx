@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -16,6 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationToast } from "@/components/NotificationToast";
 
 const StudentDashboard = () => {
   const { toast } = useToast();
@@ -229,35 +231,51 @@ const StudentDashboard = () => {
     initDashboard();
   }, [authLoading, userRole, navigate]);
 
-  return (
-    <div className="min-h-screen bg-muted/30 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" asChild>
-              <Link to="/">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Student Dashboard</h1>
-              <p className="text-muted-foreground">Welcome back, John Doe</p>
-            </div>
+  if (loading || authLoading) {
+    return (
+      <>
+        <NotificationToast studentId={studentId} />
+        <div className="min-h-screen bg-muted/30 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading your dashboard...</p>
           </div>
-          <Badge variant="outline" className="px-3 py-1">
-            ID: STU2024001
-          </Badge>
         </div>
+      </>
+    );
+  }
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Available Classes */}
-            <Card className="card-elevated">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="mr-2 h-5 w-5" />
+  return (
+    <>
+      <NotificationToast studentId={studentId} />
+      <div className="min-h-screen bg-muted/30 p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" asChild>
+                <Link to="/">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold">Student Dashboard</h1>
+                <p className="text-muted-foreground">Welcome back, John Doe</p>
+              </div>
+            </div>
+            <Badge variant="outline" className="px-3 py-1">
+              ID: STU2024001
+            </Badge>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Available Classes */}
+              <Card className="card-elevated">
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="mr-2 h-5 w-5" />
                   Available Classes
                 </CardTitle>
                 <CardDescription>Classes you can attend</CardDescription>
@@ -300,7 +318,7 @@ const StudentDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Attendance History */}
+            {/* Attendance History with Chart */}
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -309,7 +327,7 @@ const StudentDashboard = () => {
                 </CardTitle>
                 <CardDescription>Your attendance record by course</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 {loading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
@@ -321,54 +339,86 @@ const StudentDashboard = () => {
                     <p className="text-sm">Attend some classes to see your statistics</p>
                   </div>
                 ) : (
-                  attendanceStats.map((record, index) => (
-                    <div key={index} className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">{record.subject}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {record.present} of {record.total} classes attended
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">{record.attendance}%</div>
-                          <Badge 
-                            variant={record.attendance >= 90 ? "default" : record.attendance >= 75 ? "secondary" : "destructive"}
-                            className={record.attendance >= 90 ? "bg-success text-success-foreground" : ""}
-                          >
-                            {record.attendance >= 90 ? "Excellent" : record.attendance >= 75 ? "Good" : "Warning"}
-                          </Badge>
-                        </div>
-                      </div>
-                      <Progress value={record.attendance} className="h-2" />
-                      {record.attendance < 75 && (
-                        <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-md">
-                          <AlertCircle className="h-4 w-4 text-destructive" />
-                          <p className="text-xs text-destructive">
-                            Below 75% requirement - {75 - record.attendance}% more needed to qualify for exams
-                          </p>
-                        </div>
-                      )}
-                      {record.attendance >= 75 && record.attendance < 90 && (
-                        <div className="flex items-center gap-2 p-2 bg-success/10 rounded-md">
-                          <CheckCircle className="h-4 w-4 text-success" />
-                          <p className="text-xs text-success">
-                            Meets 75% requirement for exam qualification
-                          </p>
-                        </div>
-                      )}
+                  <>
+                    {/* Attendance Chart */}
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={attendanceStats}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis 
+                            dataKey="subject" 
+                            tick={{ fontSize: 12 }}
+                            angle={-15}
+                            textAnchor="end"
+                            height={60}
+                          />
+                          <YAxis />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--background))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Bar 
+                            dataKey="attendance" 
+                            fill="hsl(var(--primary))"
+                            radius={[8, 8, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))
+
+                    {/* Detailed Stats */}
+                    {attendanceStats.map((record, index) => (
+                      <div key={index} className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="font-medium">{record.subject}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {record.present} of {record.total} classes attended
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold">{record.attendance}%</div>
+                            <Badge 
+                              variant={record.attendance >= 90 ? "default" : record.attendance >= 75 ? "secondary" : "destructive"}
+                              className={record.attendance >= 90 ? "bg-success text-success-foreground" : ""}
+                            >
+                              {record.attendance >= 90 ? "Excellent" : record.attendance >= 75 ? "Good" : "Warning"}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Progress value={record.attendance} className="h-2" />
+                        {record.attendance < 75 && (
+                          <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-md">
+                            <AlertCircle className="h-4 w-4 text-destructive" />
+                            <p className="text-xs text-destructive">
+                              Below 75% requirement - {75 - record.attendance}% more needed to qualify for exams
+                            </p>
+                          </div>
+                        )}
+                        {record.attendance >= 75 && record.attendance < 90 && (
+                          <div className="flex items-center gap-2 p-2 bg-success/10 rounded-md">
+                            <CheckCircle className="h-4 w-4 text-success" />
+                            <p className="text-xs text-success">
+                              Meets 75% requirement for exam qualification
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Stats */}
-            <div className="grid gap-4">
-              <Card className="card-elevated">
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Quick Stats */}
+              <div className="grid gap-4">
+                <Card className="card-elevated">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <CheckCircle className="h-5 w-5 text-success" />
@@ -377,9 +427,9 @@ const StudentDashboard = () => {
                   <div className="text-3xl font-bold text-success">{overallAttendance}%</div>
                   <p className="text-sm text-muted-foreground">Above minimum requirement</p>
                 </CardContent>
-              </Card>
+                </Card>
 
-              <Card className="card-elevated">
+                <Card className="card-elevated">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <BookOpen className="h-5 w-5 text-primary" />
@@ -388,11 +438,11 @@ const StudentDashboard = () => {
                   <div className="text-3xl font-bold">{classes.length}</div>
                   <p className="text-sm text-muted-foreground">Current semester</p>
                 </CardContent>
-              </Card>
-            </div>
+                </Card>
+              </div>
 
-            {/* Notifications */}
-            <Card className="card-elevated">
+              {/* Notifications */}
+              <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Bell className="mr-2 h-5 w-5" />
@@ -437,10 +487,10 @@ const StudentDashboard = () => {
                   ))
                 )}
               </CardContent>
-            </Card>
+              </Card>
 
-            {/* Quick Actions */}
-            <Card className="card-elevated">
+              {/* Quick Actions */}
+              <Card className="card-elevated">
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
@@ -455,11 +505,12 @@ const StudentDashboard = () => {
                   Attendance Report
                 </Button>
               </CardContent>
-            </Card>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

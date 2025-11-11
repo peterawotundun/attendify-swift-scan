@@ -151,11 +151,8 @@ const AdminDashboard = () => {
   const sidebarItems = [
     { title: "Dashboard", icon: LayoutDashboard, href: "/admin" },
     { title: "User Management", icon: Users, href: "/admin/users" },
-    { title: "Class Management", icon: BookOpen, href: "/admin/classes" },
-    { title: "Schedule", icon: Calendar, href: "/admin/schedule" },
     { title: "Reports", icon: FileText, href: "/admin/reports" },
-    { title: "Security", icon: Shield, href: "/admin/security" },
-    { title: "Settings", icon: Settings, href: "/admin/settings" },
+    { title: "Settings", icon: Settings, href: "/admin" },
   ];
 
   if (loading) {
