@@ -1,75 +1,77 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Attendify Design System - Clean, Modern Academic Tech Platform
+/* Attendify Professional Design System
+Enterprise-grade academic technology platform
 All colors MUST be HSL for consistency
 */
 
 @layer base {
   :root {
-    /* Attendify Color System - Light Theme */
+    /* Professional Color System - Light Theme */
     --background: 0 0% 100%;
-    --foreground: 220 13% 18%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 13% 18%;
-    --card-secondary: 220 20% 97%;
+    --card-foreground: 222 47% 11%;
+    --card-secondary: 214 32% 98%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 13% 18%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Primary - Deep Purple (#1800ad) */
-    --primary: 260 100% 34%;
+    /* Primary - Professional Blue (#2563eb) */
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 260 100% 45%;
-    --primary-dark: 260 100% 25%;
+    --primary-light: 221 83% 63%;
+    --primary-dark: 221 83% 43%;
 
-    /* Secondary - Light Gray */
-    --secondary: 220 20% 97%;
-    --secondary-foreground: 220 13% 18%;
+    /* Secondary - Refined Purple Accent */
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Success - Bright Green (#7ed957) */
-    --success: 90 62% 70%;
+    /* Success - Professional Green */
+    --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
-    --success-light: 90 62% 80%;
+    --success-light: 142 76% 46%;
 
     /* Muted colors */
-    --muted: 220 20% 97%;
-    --muted-foreground: 220 13% 46%;
+    --muted: 214 32% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 220 20% 97%;
-    --accent-foreground: 220 13% 18%;
+    --accent: 214 32% 96%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 20% 90%;
-    --input: 220 20% 90%;
-    --ring: 260 100% 34%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    /* Attendify Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(260 100% 34%) 0%, hsl(260 100% 45%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 20% 98%) 100%);
+    /* Professional Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(221 83% 53%) 0%, hsl(262 83% 58%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(214 32% 99%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(221 83% 53% / 0.1) 0%, hsl(262 83% 58% / 0.1) 100%);
     
-    /* Shadows */
-    --shadow-card: 0 4px 6px -1px hsl(220 13% 18% / 0.1), 0 2px 4px -1px hsl(220 13% 18% / 0.06);
-    --shadow-hover: 0 10px 15px -3px hsl(220 13% 18% / 0.1), 0 4px 6px -2px hsl(220 13% 18% / 0.05);
-    --shadow-focus: 0 0 0 3px hsl(260 100% 34% / 0.1);
+    /* Enhanced Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
+    --shadow-card: 0 1px 3px 0 hsl(222 47% 11% / 0.1), 0 1px 2px -1px hsl(222 47% 11% / 0.1);
+    --shadow-hover: 0 10px 25px -5px hsl(222 47% 11% / 0.15), 0 8px 10px -6px hsl(222 47% 11% / 0.1);
+    --shadow-focus: 0 0 0 3px hsl(221 83% 53% / 0.15);
+    --shadow-elevated: 0 20px 25px -5px hsl(222 47% 11% / 0.1), 0 8px 10px -6px hsl(222 47% 11% / 0.05);
 
     /* Sidebar */
-    --sidebar-background: 220 20% 97%;
-    --sidebar-foreground: 220 13% 18%;
-    --sidebar-primary: 260 100% 34%;
+    --sidebar-background: 214 32% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 90%;
-    --sidebar-accent-foreground: 220 13% 18%;
-    --sidebar-border: 220 20% 90%;
-    --sidebar-ring: 260 100% 34%;
+    --sidebar-accent: 214 32% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 221 83% 53%;
   }
 
   .dark {
@@ -121,48 +123,106 @@ All colors MUST be HSL for consistency
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-poppins font-semibold tracking-tight;
+  }
+  
+  h1 {
+    @apply text-4xl lg:text-5xl;
+  }
+  
+  h2 {
+    @apply text-3xl lg:text-4xl;
+  }
+  
+  h3 {
+    @apply text-2xl lg:text-3xl;
   }
 }
 
 @layer components {
   /* Hero Background */
   .hero-bg {
-    background-image: linear-gradient(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.7)),
-                      url('/src/assets/university-classroom.jpg');
+    background: linear-gradient(135deg, hsl(221 83% 53% / 0.05) 0%, hsl(262 83% 58% / 0.05) 100%);
+    position: relative;
+  }
+  
+  .hero-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/src/assets/university-classroom.jpg');
     background-size: cover;
     background-position: center;
-    background-repeat: no-repeat;
+    opacity: 0.08;
+    z-index: 0;
   }
 
   /* Card Components */
   .card-elevated {
-    @apply bg-gradient-to-br from-card to-card-secondary shadow-[var(--shadow-card)] 
-           hover:shadow-[var(--shadow-hover)] transition-all duration-300;
+    @apply bg-gradient-to-br from-card to-card-secondary border border-border/50
+           shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-hover)] 
+           transition-all duration-300;
+  }
+  
+  .card-interactive {
+    @apply card-elevated hover:scale-[1.02] hover:border-primary/20 cursor-pointer;
   }
 
   /* Status Indicators */
   .status-connected {
-    @apply bg-success text-success-foreground;
+    @apply bg-success text-success-foreground shadow-sm;
   }
 
   .status-disconnected {
-    @apply bg-destructive text-destructive-foreground;
+    @apply bg-destructive text-destructive-foreground shadow-sm;
   }
 
   /* Interactive Elements */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary-dark 
-           focus:ring-[var(--shadow-focus)] transition-all duration-200;
+    @apply bg-gradient-to-r from-primary to-primary-light text-primary-foreground 
+           hover:from-primary-dark hover:to-primary shadow-sm hover:shadow-md
+           focus:ring-4 focus:ring-primary/20 transition-all duration-200 font-medium;
   }
 
   .btn-success {
     @apply bg-success text-success-foreground hover:bg-success-light 
-           transition-all duration-200;
+           shadow-sm hover:shadow-md transition-all duration-200 font-medium;
   }
 
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground border-2 border-primary/20 
-           hover:border-primary/40 hover:bg-primary/5 transition-all duration-200;
+    @apply bg-card text-foreground border-2 border-border
+           hover:border-primary hover:bg-primary/5 hover:text-primary
+           transition-all duration-200 font-medium shadow-sm;
+  }
+  
+  /* Animations */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease-out;
+  }
+  
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  .animate-slide-in-right {
+    animation: slide-in-right 0.5s ease-out;
   }
 }
