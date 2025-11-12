@@ -14,6 +14,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminReports from "./pages/AdminReports";
 import ClassScheduling from "./pages/ClassScheduling";
 import AttendanceSession from "./pages/AttendanceSession";
+import AttendanceHistory from "./pages/AttendanceHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/admin/reports" element={<AdminReports />} />
             <Route path="/schedule" element={<ClassScheduling />} />
             <Route path="/session/:id" element={<AttendanceSession />} />
+            <Route path="/attendance-history" element={<AttendanceHistory />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

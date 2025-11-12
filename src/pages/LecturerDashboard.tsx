@@ -165,9 +165,9 @@ const LecturerDashboard = () => {
                 </Link>
               </Button>
               <Button variant="ghost" className="w-full justify-start" asChild>
-                <Link to="/schedule">
+                <Link to="/attendance-history">
                   <Users className="mr-2 h-4 w-4" />
-                  Attendance
+                  Attendance History
                 </Link>
               </Button>
               <Button variant="ghost" className="w-full justify-start" asChild>

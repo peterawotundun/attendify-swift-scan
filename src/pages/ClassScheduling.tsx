@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TimePicker } from "@/components/ui/time-picker";
 import { ArrowLeft, Plus, Edit, Trash, Play } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +19,9 @@ const ClassScheduling = () => {
   const [courseName, setCourseName] = useState("");
   const [courseCode, setCourseCode] = useState("");
   const [room, setRoom] = useState("");
-  const [time, setTime] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [day, setDay] = useState("");
   const [maxStudents, setMaxStudents] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [classes, setClasses] = useState([]);
@@ -76,11 +80,13 @@ const ClassScheduling = () => {
     setIsLoading(true);
     setError("");
     
-    if (!courseName || !courseCode || !room || !time || !maxStudents) {
+    if (!courseName || !courseCode || !room || !startTime || !endTime || !day || !maxStudents) {
       setError("All fields are required.");
       setIsLoading(false);
       return;
     }
+
+    const timeRange = `${startTime} - ${endTime}`;
 
     try {
       const { data, error } = await supabase
@@ -89,7 +95,8 @@ const ClassScheduling = () => {
           name: courseName,
           code: courseCode,
           room,
-          time,
+          time: timeRange,
+          day,
           total_students: parseInt(maxStudents),
         })
         .select("*")
@@ -106,7 +113,9 @@ const ClassScheduling = () => {
       setCourseName("");
       setCourseCode("");
       setRoom("");
-      setTime("");
+      setStartTime("");
+      setEndTime("");
+      setDay("");
       setMaxStudents("");
     } catch (error) {
       console.error("Error creating class:", error);
@@ -161,7 +170,13 @@ const ClassScheduling = () => {
     setCourseName(classData.name);
     setCourseCode(classData.code);
     setRoom(classData.room);
-    setTime(classData.time);
+    
+    // Parse time range
+    const times = classData.time?.split(" - ") || ["", ""];
+    setStartTime(times[0] || "");
+    setEndTime(times[1] || "");
+    
+    setDay(classData.day || "");
     setMaxStudents(classData.total_students.toString());
   };
 
@@ -169,11 +184,13 @@ const ClassScheduling = () => {
     setIsLoading(true);
     setError("");
     
-    if (!courseName || !courseCode || !room || !time || !maxStudents) {
+    if (!courseName || !courseCode || !room || !startTime || !endTime || !day || !maxStudents) {
       setError("All fields are required.");
       setIsLoading(false);
       return;
     }
+
+    const timeRange = `${startTime} - ${endTime}`;
 
     try {
       const { error } = await supabase
@@ -182,7 +199,8 @@ const ClassScheduling = () => {
           name: courseName,
           code: courseCode,
           room,
-          time,
+          time: timeRange,
+          day,
           total_students: parseInt(maxStudents),
         })
         .eq("id", editingClass.id);
@@ -215,7 +233,9 @@ const ClassScheduling = () => {
     setCourseName("");
     setCourseCode("");
     setRoom("");
-    setTime("");
+    setStartTime("");
+    setEndTime("");
+    setDay("");
     setMaxStudents("");
     setError("");
   };
@@ -330,15 +350,36 @@ const ClassScheduling = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="room">Room</Label>
-                  <Input id="room" value={room} onChange={e => setRoom(e.target.value)} />
+                  <Input id="room" value={room} onChange={e => setRoom(e.target.value)} placeholder="e.g., LT1" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="time">Time</Label>
-                  <Input id="time" value={time} onChange={e => setTime(e.target.value)} />
+                  <Label htmlFor="day">Day</Label>
+                  <Select value={day} onValueChange={setDay}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select day" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Monday">Monday</SelectItem>
+                      <SelectItem value="Tuesday">Tuesday</SelectItem>
+                      <SelectItem value="Wednesday">Wednesday</SelectItem>
+                      <SelectItem value="Thursday">Thursday</SelectItem>
+                      <SelectItem value="Friday">Friday</SelectItem>
+                      <SelectItem value="Saturday">Saturday</SelectItem>
+                      <SelectItem value="Sunday">Sunday</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <TimePicker value={startTime} onChange={setStartTime} placeholder="Select start time" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <TimePicker value={endTime} onChange={setEndTime} placeholder="Select end time" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="max-students">Maximum Students</Label>
-                  <Input id="max-students" type="number" value={maxStudents} onChange={e => setMaxStudents(e.target.value)} />
+                  <Input id="max-students" type="number" value={maxStudents} onChange={e => setMaxStudents(e.target.value)} placeholder="e.g., 50" />
                 </div>
                 {error && <div className="text-red-500">{error}</div>}
                 {isEditMode ? (
@@ -380,8 +421,9 @@ const ClassScheduling = () => {
                             <Badge variant="outline">{schedule.code}</Badge>
                           </div>
                           <div className="flex space-x-6 text-sm text-muted-foreground">
-                            <span>{schedule.room}</span>
+                            <span>{schedule.day}</span>
                             <span>{schedule.time}</span>
+                            <span>Room {schedule.room}</span>
                             <span>{schedule.total_students} students</span>
                           </div>
                         </div>
