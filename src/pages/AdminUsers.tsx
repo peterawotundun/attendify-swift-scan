@@ -27,6 +27,8 @@ const AdminUsers = () => {
   const [department, setDepartment] = useState("");
   const [level, setLevel] = useState("");
   const [role, setRole] = useState<"student" | "lecturer" | "admin">("student");
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [newRole, setNewRole] = useState<"student" | "lecturer" | "admin">("student");
 
   useEffect(() => {
     fetchUsers();
@@ -129,11 +131,38 @@ const AdminUsers = () => {
       });
       
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
       toast({
         title: "Error",
-        description: "Failed to delete user",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleChangeRole = async (userId: string, newRole: "student" | "lecturer" | "admin") => {
+    try {
+      // Update the user_roles table
+      const { error } = await supabase
+        .from("user_roles")
+        .update({ role: newRole })
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Role updated to ${newRole}`,
+      });
+
+      setEditingUserId(null);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Error changing role:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change role",
         variant: "destructive",
       });
     }
@@ -260,15 +289,38 @@ const AdminUsers = () => {
                       <TableCell className="font-mono text-sm">{user.rfid_code}</TableCell>
                       <TableCell>{user.department}</TableCell>
                       <TableCell>
-                        <Badge variant={user.user_roles?.role === 'admin' ? 'default' : 'outline'}>
-                          {user.user_roles?.role || 'student'}
-                        </Badge>
+                        {editingUserId === user.user_id ? (
+                          <Select 
+                            value={newRole} 
+                            onValueChange={(value: "student" | "lecturer" | "admin") => {
+                              setNewRole(value);
+                              handleChangeRole(user.user_id, value);
+                            }}
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="student">Student</SelectItem>
+                              <SelectItem value="lecturer">Lecturer</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge 
+                            variant="outline" 
+                            className="cursor-pointer hover:bg-accent"
+                            onClick={() => {
+                              setEditingUserId(user.user_id);
+                              setNewRole(user.user_roles?.role || "student");
+                            }}
+                          >
+                            {user.user_roles?.role || "student"}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
                           <Button 
                             variant="outline" 
                             size="sm"

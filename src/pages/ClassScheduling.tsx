@@ -22,12 +22,14 @@ const ClassScheduling = () => {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [day, setDay] = useState("");
+  const [level, setLevel] = useState("");
   const [maxStudents, setMaxStudents] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState("");
   const [editingClass, setEditingClass] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [lecturerDepartment, setLecturerDepartment] = useState("");
 
   // Fetch classes from DB
   const fetchClasses = async () => {
@@ -52,7 +54,26 @@ const ClassScheduling = () => {
 
   useEffect(() => {
     fetchClasses();
+    fetchLecturerProfile();
   }, []);
+
+  const fetchLecturerProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("department")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error) throw error;
+      setLecturerDepartment(profile?.department || "");
+    } catch (error) {
+      console.error("Error fetching lecturer profile:", error);
+    }
+  };
 
   // Delete all attendance sessions in DB
   const handleDeleteAllSessions = async () => {
@@ -80,7 +101,7 @@ const ClassScheduling = () => {
     setIsLoading(true);
     setError("");
     
-    if (!courseName || !courseCode || !room || !startTime || !endTime || !day || !maxStudents) {
+    if (!courseName || !courseCode || !room || !startTime || !endTime || !day || !level || !maxStudents) {
       setError("All fields are required.");
       setIsLoading(false);
       return;
@@ -97,6 +118,8 @@ const ClassScheduling = () => {
           room,
           time: timeRange,
           day,
+          level,
+          department: lecturerDepartment,
           total_students: parseInt(maxStudents),
         })
         .select("*")
@@ -106,7 +129,7 @@ const ClassScheduling = () => {
 
       toast({
         title: "Success",
-        description: "Class created successfully",
+        description: "Class created successfully and students auto-enrolled",
       });
       
       fetchClasses();
@@ -116,12 +139,13 @@ const ClassScheduling = () => {
       setStartTime("");
       setEndTime("");
       setDay("");
+      setLevel("");
       setMaxStudents("");
     } catch (error) {
       console.error("Error creating class:", error);
       setError(error.message || "Failed to create class");
       toast({
-        title: "Error", 
+        title: "Error",
         description: error.message || "Failed to create class",
         variant: "destructive",
       });
@@ -177,14 +201,15 @@ const ClassScheduling = () => {
     setEndTime(times[1] || "");
     
     setDay(classData.day || "");
+    setLevel(classData.level || "");
     setMaxStudents(classData.total_students.toString());
   };
 
   const handleUpdateClass = async () => {
     setIsLoading(true);
     setError("");
-    
-    if (!courseName || !courseCode || !room || !startTime || !endTime || !day || !maxStudents) {
+
+    if (!courseName || !courseCode || !room || !startTime || !endTime || !day || !level || !maxStudents) {
       setError("All fields are required.");
       setIsLoading(false);
       return;
@@ -201,6 +226,7 @@ const ClassScheduling = () => {
           room,
           time: timeRange,
           day,
+          level,
           total_students: parseInt(maxStudents),
         })
         .eq("id", editingClass.id);
@@ -211,14 +237,14 @@ const ClassScheduling = () => {
         title: "Success",
         description: "Class updated successfully",
       });
-      
+
       fetchClasses();
       cancelEdit();
     } catch (error) {
       console.error("Error updating class:", error);
       setError(error.message || "Failed to update class");
       toast({
-        title: "Error", 
+        title: "Error",
         description: error.message || "Failed to update class",
         variant: "destructive",
       });
@@ -236,6 +262,7 @@ const ClassScheduling = () => {
     setStartTime("");
     setEndTime("");
     setDay("");
+    setLevel("");
     setMaxStudents("");
     setError("");
   };
@@ -381,6 +408,20 @@ const ClassScheduling = () => {
                   <Label htmlFor="max-students">Maximum Students</Label>
                   <Input id="max-students" type="number" value={maxStudents} onChange={e => setMaxStudents(e.target.value)} placeholder="e.g., 50" />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="level">Level</Label>
+                  <Select value={level} onValueChange={setLevel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="100">100 Level</SelectItem>
+                      <SelectItem value="200">200 Level</SelectItem>
+                      <SelectItem value="300">300 Level</SelectItem>
+                      <SelectItem value="400">400 Level</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {error && <div className="text-red-500">{error}</div>}
                 {isEditMode ? (
                   <div className="flex space-x-2">
@@ -424,6 +465,8 @@ const ClassScheduling = () => {
                             <span>{schedule.day}</span>
                             <span>{schedule.time}</span>
                             <span>Room {schedule.room}</span>
+                            <span>Level {schedule.level}</span>
+                            <span>{schedule.department}</span>
                             <span>{schedule.total_students} students</span>
                           </div>
                         </div>
